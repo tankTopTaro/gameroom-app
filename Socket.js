@@ -1,3 +1,5 @@
+const WebSocket = require('ws');
+
 class Socket{
     constructor(page, port) {
         this.page = page
@@ -44,7 +46,7 @@ class Socket{
         });
     }
 
-    receiveMessage() {
+    waitForMessage() {
         return new Promise((resolve, reject) => {
             this.clients.forEach(client => {
                 client.on('message', raw => {

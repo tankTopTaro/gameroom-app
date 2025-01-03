@@ -12,12 +12,12 @@
 const express = require('express');
 const path = require('path');
 const Console = require("console");
-const WebSocket = require('ws');
-const { handleUncaughtException, hsvToRgb, areRectanglesIntersecting, calculateDistance, mapValue } = require('./utils.js');
+const { handleUncaughtException, hsvToRgb, areRectanglesIntersecting } = require('./utils.js');
 
 require('dotenv').config();
 
-const roomType = process.env.GAME_ROOM_DOUBLE_GRID;
+//const roomType = process.env.GAME_ROOM_BASKETBALLHOOPS;
+const roomType = process.env.GAME_ROOM_DOUBLEGRID;
 const dummyPlayers = {};    // TODO: Replace with actual database
 
 process.on('uncaughtException', handleUncaughtException)
@@ -50,7 +50,7 @@ class Room{
 
     async init(){
         await this.prepareLights()
-        await this.mesure()
+        await this.measure()
         this.startServer()
         this.socketForMonitor = new Socket('monitor', 8080)
         this.socketForRoom = new Socket('room', 8081)
@@ -59,6 +59,7 @@ class Room{
 
     prepareLights(){
         if(this.type === 'doubleGrid'){
+
             this.addMatrix(130,130,'rectangle','ledSwitch',960,480,25,25,5,5,'mainFloor', true)
 
             this.addMatrix(255,70,'rectangle','ledSwitch',960,100,15,15,200,40, 'wallButtons',false)
@@ -70,6 +71,10 @@ class Room{
             this.addMatrix(250,670,'rectangle','screen',960,100,25,25,190,40,'wallScreens',false)
             this.addMatrix(30,235,'rectangle','screen',100,500,25,25,40,190,'wallScreens',false)
             this.addMatrix(1150,235,'rectangle','screen',100,500,25,25,40,190,'wallScreens',false)
+
+        }
+        else if(this.type === 'basketballHoops'){
+            this.addMatrix(130,130,'rectangle','ledSwitch',960,100,80,80,90,5,'wallButtons', false)
         }
     }
 
@@ -106,7 +111,7 @@ class Room{
         // Prepare server
         this.server = express();
         const serverPort = process.env.GAME_ROOM_SERVER_PORT || 3001;
-        const serverHostname = process.env.GAME_ROOM_SERVER_HOST || 'localhost';
+        const serverHostname = 'localhost';
 
         // Middleware to set no-cache headers for all routes
         this.server.use((req, res, next) => {
@@ -168,30 +173,27 @@ class Room{
             if(this.isFree){
                 this.currentGameSession = new GameSession(req.query.rule,req.query.level)
                 let gameSessionInitialized = await this.currentGameSession.init()
-                let message = {
-                    'type': 'gameSessionInitialized',
-                    'value': gameSessionInitialized
-                }
-
-                if(gameSessionInitialized === true){
-                    res.send('<html><body><h1>Please enter the room</h1></body></html>');
-                    //res.json({ "gameSessionInitialized": gameSessionInitialized });
-                }
-                else{
-                    //res.json({ "gameSessionInitialized": gameSessionInitialized });
-                    res.send('<html><body><h1>'+gameSessionInitialized+'</h1></body></html>');
+                
+                let message = { 
+                    'type': 'gameSessionInitialized', 
+                    'message': 'Please wait'
                 }
                 room.socketForDoor.broadcastMessage(JSON.stringify(message));
+                
+                if(gameSessionInitialized === true){
+                    //res.send('<html><body><h1>Please enter the room</h1></body></html>');
+                    res.json({ "gameSessionInitialized": gameSessionInitialized });
+                }
+                else{
+                    res.json({ "gameSessionInitialized": gameSessionInitialized });
+                    //res.send('<html><body><h1>'+gameSessionInitialized+'</h1></body></html>');
+                }
+                
             }
             else{
                 this.waitingGameSession = new GameSession(req.query.rule,req.query.level)
-                res.send('<html><body><h1>Please wait</h1></body></html>');
-                //res.json({ "waitingGameSession": this.waitingGameSession });
-                let message = {
-                    'type': 'waitingGameSession',
-                    'value': this.waitingGameSession
-                }
-                room.socketForDoor.broadcastMessage(JSON.stringify(message));
+                //res.send('<html><body><h1>Please wait</h1></body></html>');
+                res.json({ "waitingGameSession": this.waitingGameSession });
             }
         });
 
@@ -332,6 +334,8 @@ class GameSession{
         this.levelsStartedWhileSessionIsWaiting = 0
     }
 
+    // Initializes a variable called result,
+    // It then calls the prepareAndGreet function and awaits its completion
     async init(){
         let result
 
@@ -354,6 +358,7 @@ class GameSession{
         return result
     }
 
+    // Resets the game states
     reset(){
         this.status = undefined
         this.shapes = []
@@ -389,17 +394,25 @@ class GameSession{
     async prepare(){  // prepares anything that is better to prepare and wait for the players input on a certain button (or a countdown to end)
         return new Promise((resolve,reject) => {
             console.log('preparation starts...');
+            this.prepTime = 20
             this.timeForLevel = 60
             this.countdown = this.timeForLevel
-            this.lifes = 5
+            this.lifes = 5      // At every level, the player starts with 5 lifes 
+            this.lastLifeLostAt = 0
             let message = {
                 'type':'newLevelStarts',
                 'rule':this.rule,
                 'level':this.level,
+                'lifes':this.lifes,
                 'countdown':this.countdown,
-                'lifes':this.lifes
+                'prepTime':this.prepTime,
+                'message': 'Please enter the room',
+                'audio': '321go'
             }
+
             room.socketForRoom.broadcastMessage(JSON.stringify(message))
+            room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+            room.socketForDoor.broadcastMessage(JSON.stringify(message))
 
             setTimeout(async () => {
                 try{
@@ -413,10 +426,11 @@ class GameSession{
                     reject(e);
                 }
 
-            }, 1000);
+            }, this.prepTime * 1000);
         });
     }
 
+    // Generates a shape that moves along a predefined path
     prepareShapes(){
         // TODO: See if I can smooth out the animation of the path
         if(roomType === 'doubleGrid'){
@@ -539,7 +553,7 @@ class GameSession{
         } 
     }
 
-    // TODO: run the prepTimer first before starting the level
+    // Starts the game session
     start(){
         if (this.status === 'running') {
             console.warn('Game is already running. Ignoring start call.');
@@ -549,232 +563,236 @@ class GameSession{
         console.log('Starting the Game...');
         this.lastLevelStartedAt = Date.now()
         
-            if(roomType === 'doubleGrid'){          // Checks the room type
-                if(this.rule === 1){                // Checks the rule 
-                    if(this.level === 1){           // Checks the level
+        if(roomType === 'doubleGrid'){          // Checks the room type
+            if(this.rule === 1){                // Checks the rule 
+                if(this.level === 1){           // Checks the level
 
-                        function getRandomInt(min, max) {
-                            return Math.floor(Math.random() * (max - min + 1)) + min;
-                        }
-                        function shuffleArray(array) {
-                            for (let i = array.length - 1; i > 0; i--) {
-                                const j = getRandomInt(0, i);
-                                [array[i], array[j]] = [array[j], array[i]];
-                            }
-                        }
-                        
-                        // Generates an array of numbers, shuffles it, and returns the shuffled sequence.
-                        function makeNumberSequence(size){
-                            const numbersSequence = [];
-                            for (let i = 1; i <= size; i++) {
-                                numbersSequence.push(i);
-                            }
-                            shuffleArray(numbersSequence);
-                            return numbersSequence
-                        }
-
-                        const numbersSequence = makeNumberSequence(12)
-                        console.log('TEST: numbersSequence: ',numbersSequence)
-
-                        this.ligthIdsSequence = []
-
-                        room.lightGroups.wallScreens.forEach((light, i) => {
-                            light.color = [0,0,numbersSequence[i]]
-                        })
-
-                        room.lightGroups.wallButtons.forEach((light, i) => {
-                            light.color = blueGreen1
-                            light.onClick = 'report'
-                            this.ligthIdsSequence[numbersSequence[i]] = light.id
-                        })
-
-                        this.ligthIdsSequence.splice(0, 1)
-
+                    function getRandomInt(min, max) {
+                        return Math.floor(Math.random() * (max - min + 1)) + min;
                     }
-                    else if(this.level === 2){
-                        // TODO: refactor this as it duplicates the code from level 1
-                        function getRandomInt(min, max) {
-                            return Math.floor(Math.random() * (max - min + 1)) + min;
+                    function shuffleArray(array) {
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = getRandomInt(0, i);
+                            [array[i], array[j]] = [array[j], array[i]];
                         }
-                        function shuffleArray(array) {
-                            for (let i = array.length - 1; i > 0; i--) {
-                                const j = getRandomInt(0, i);
-                                [array[i], array[j]] = [array[j], array[i]];
-                            }
-                        }
-                        function makeNumberSequence(size){
-                            const numbersSequence = [];
-                            for (let i = 1; i <= size; i++) {
-                                numbersSequence.push(i);
-                            }
-                            shuffleArray(numbersSequence);
-                            return numbersSequence
-                        }
-
-                        const numbersSequence = makeNumberSequence(12)
-                        console.log('TEST: numbersSequence: ',numbersSequence)
-
-                        this.ligthIdsSequence = []
-
-                        room.lightGroups.wallScreens.forEach((light, i) => {
-                            light.color = [0,0,numbersSequence[i]]
-                        })
-                        room.lightGroups.wallButtons.forEach((light, i) => {
-                            light.color = blueGreen1
-                            light.onClick = 'report'
-                            this.ligthIdsSequence[numbersSequence[i]] = light.id
-                        })
-                        this.ligthIdsSequence.splice(0, 1)
-
                     }
-                    else if(this.level === 3){
-                        // TODO: refactor this as it duplicates the code from level 1
-                        function getRandomInt(min, max) {
-                            return Math.floor(Math.random() * (max - min + 1)) + min;
+                    
+                    // Generates an array of numbers, shuffles it, and returns the shuffled sequence.
+                    function makeNumberSequence(size){
+                        const numbersSequence = [];
+                        for (let i = 1; i <= size; i++) {
+                            numbersSequence.push(i);
                         }
-                        function shuffleArray(array) {
-                            for (let i = array.length - 1; i > 0; i--) {
-                                const j = getRandomInt(0, i);
-                                [array[i], array[j]] = [array[j], array[i]];
-                            }
-                        }
-                        function makeNumberSequence(size){
-                            const numbersSequence = [];
-                            for (let i = 1; i <= size; i++) {
-                                numbersSequence.push(i);
-                            }
-                            shuffleArray(numbersSequence);
-                            return numbersSequence
-                        }
-
-                        const numbersSequence = makeNumberSequence(12)
-                        console.log('TEST: numbersSequence: ',numbersSequence)
-
-                        this.ligthIdsSequence = []
-
-                        room.lightGroups.wallScreens.forEach((light, i) => {
-                            light.color = [0,0,numbersSequence[i]]
-                        })
-                        room.lightGroups.wallButtons.forEach((light, i) => {
-                            light.color = blueGreen1
-                            light.onClick = 'report'
-                            this.ligthIdsSequence[numbersSequence[i]] = light.id
-                        })
-                        this.ligthIdsSequence.splice(0, 1)
+                        shuffleArray(numbersSequence);
+                        return numbersSequence
                     }
+
+                    const numbersSequence = makeNumberSequence(12)
+                    console.log('TEST: numbersSequence: ',numbersSequence)
+
+                    this.ligthIdsSequence = []
+
+                    room.lightGroups.wallScreens.forEach((light, i) => {
+                        light.color = [0,0,numbersSequence[i]]
+                    })
+
+                    room.lightGroups.wallButtons.forEach((light, i) => {
+                        light.color = blueGreen1
+                        light.onClick = 'report'
+                        this.ligthIdsSequence[numbersSequence[i]] = light.id
+                    })
+
+                    this.ligthIdsSequence.splice(0, 1)
+
                 }
-            } 
-            else if(roomType === 'basketballHoops'){
-                if(this.rule === 1){
-                    if(this.level === 1){
-                        const colors = [
-                            [255,0,0],    // red
-                            [0,255,0],    // green
-                            [0,0,255],    // blue
-                            [255,255,0],  // yellow
-                            [255,0,255]   // purple
-                        ];
-
-                        function getColorName(rgb) {
-                            const colorNames = {
-                                '255,0,0': 'red',
-                                '0,255,0': 'green',
-                                '0,0,255': 'blue',
-                                '255,255,0': 'yellow',
-                                '255,0,255': 'purple'
-                            }
-
-                            return colorNames[rgb.join(',')]
-                        }
-                        
-                        // Generate a random color sequence
-                        function makeColorSequence(size) {
-                            return Array.from({ length: size }, () => Math.floor(Math.random() * colors.length));
-                        }
-                        
-                        // Shuffle an array
-                        function shuffleArray(array) {
-                            for (let i = array.length - 1; i > 0; i--) {
-                                const j = Math.floor(Math.random() * (i + 1));
-                                [array[i], array[j]] = [array[j], array[i]];
-                            }
-                            return array;
-                        }
-                        
-                        const colorsSequence = makeColorSequence(3).map(i => colors[i]);
-
-                        console.log('Color sequence:', colorsSequence);
-
-                        // Play sounds according to what is in the sequence
-                        
-                        this.lightColorSequence = new Array(colorsSequence.length).fill(null);
-
-                        let currentColorIndex = 0;
-
-                        const showColorSequence = setInterval(() => {
-                            const currentColor = colorsSequence[currentColorIndex]
-                            console.log(currentColor)
-
-                            const colorName = getColorName(currentColor)
-
-                            console.log('Showing color: ', colorName)
-
-                            let message = {
-                                'type': 'colorNames',
-                                'name': colorName
-                            }
-
-                            room.socketForRoom.broadcastMessage(JSON.stringify(message))
-
-                            room.lightGroups.wallButtons.forEach((light) => {
-                                light.color = colorsSequence[currentColorIndex];
-                            });
-                            
-                            currentColorIndex++;
-
-                            if (currentColorIndex >= colorsSequence.length) {
-                                setTimeout(() => {
-                                    clearInterval(showColorSequence);
-                                    
-                                    // TODO: Add another interval to change the shuffled colors after 3 seconds
-                                    const shuffledColors = shuffleArray([...colors]);
-                                    room.lightGroups.wallButtons.forEach((light, i) => {
-                                        light.color = shuffledColors[i]
-                                    })
-                                }, 1000)
-                            }
-                        }, 1000)
-
-                        room.lightGroups.wallButtons.forEach((light, i) => {
-                            light.onClick = 'report';
-                            this.lightColorSequence[i] = colorsSequence[i % colorsSequence.length];
-                        }); 
-
-                        this.lightColorSequence.length = colorsSequence.length;
+                else if(this.level === 2){
+                    // TODO: refactor this as it duplicates the code from level 1
+                    function getRandomInt(min, max) {
+                        return Math.floor(Math.random() * (max - min + 1)) + min;
                     }
+                    function shuffleArray(array) {
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = getRandomInt(0, i);
+                            [array[i], array[j]] = [array[j], array[i]];
+                        }
+                    }
+                    function makeNumberSequence(size){
+                        const numbersSequence = [];
+                        for (let i = 1; i <= size; i++) {
+                            numbersSequence.push(i);
+                        }
+                        shuffleArray(numbersSequence);
+                        return numbersSequence
+                    }
+
+                    const numbersSequence = makeNumberSequence(12)
+                    console.log('TEST: numbersSequence: ',numbersSequence)
+
+                    this.ligthIdsSequence = []
+
+                    room.lightGroups.wallScreens.forEach((light, i) => {
+                        light.color = [0,0,numbersSequence[i]]
+                    })
+                    room.lightGroups.wallButtons.forEach((light, i) => {
+                        light.color = blueGreen1
+                        light.onClick = 'report'
+                        this.ligthIdsSequence[numbersSequence[i]] = light.id
+                    })
+                    this.ligthIdsSequence.splice(0, 1)
+
+                }
+                else if(this.level === 3){
+                    // TODO: refactor this as it duplicates the code from level 1
+                    function getRandomInt(min, max) {
+                        return Math.floor(Math.random() * (max - min + 1)) + min;
+                    }
+                    function shuffleArray(array) {
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = getRandomInt(0, i);
+                            [array[i], array[j]] = [array[j], array[i]];
+                        }
+                    }
+                    function makeNumberSequence(size){
+                        const numbersSequence = [];
+                        for (let i = 1; i <= size; i++) {
+                            numbersSequence.push(i);
+                        }
+                        shuffleArray(numbersSequence);
+                        return numbersSequence
+                    }
+
+                    const numbersSequence = makeNumberSequence(12)
+                    console.log('TEST: numbersSequence: ',numbersSequence)
+
+                    this.ligthIdsSequence = []
+
+                    room.lightGroups.wallScreens.forEach((light, i) => {
+                        light.color = [0,0,numbersSequence[i]]
+                    })
+                    room.lightGroups.wallButtons.forEach((light, i) => {
+                        light.color = blueGreen1
+                        light.onClick = 'report'
+                        this.ligthIdsSequence[numbersSequence[i]] = light.id
+                    })
+                    this.ligthIdsSequence.splice(0, 1)
                 }
             }
+        } 
+        else if(roomType === 'basketballHoops'){
+            if(this.rule === 1){
+                if(this.level === 1){
+                    const colors = [
+                        [255,0,0],    // red
+                        [0,255,0],    // green
+                        [0,0,255],    // blue
+                        [255,255,0],  // yellow
+                        [255,0,255]   // purple
+                    ];
 
-            if (this.animationMetronome) {
-                clearInterval(this.animationMetronome);
+                    function getColorName(rgb) {
+                        const colorNames = {
+                            '255,0,0': 'red',
+                            '0,255,0': 'green',
+                            '0,0,255': 'blue',
+                            '255,255,0': 'yellow',
+                            '255,0,255': 'purple'
+                        }
+
+                        return colorNames[rgb.join(',')]
+                    }
+                    
+                    // Generate a random color sequence
+                    function makeColorSequence(size) {
+                        return Array.from({ length: size }, () => Math.floor(Math.random() * colors.length));
+                    }
+                    
+                    // Shuffle an array
+                    function shuffleArray(array) {
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [array[i], array[j]] = [array[j], array[i]];
+                        }
+                        return array;
+                    }
+                    
+                    const colorsSequence = makeColorSequence(3).map(i => colors[i]);
+
+                    console.log('Color sequence:', colorsSequence);
+
+                    // Play sounds according to what is in the sequence
+                    
+                    this.lightColorSequence = new Array(colorsSequence.length).fill(null);
+
+                    let currentColorIndex = 0;
+
+                    const showColorSequence = setInterval(() => {
+                        const currentColor = colorsSequence[currentColorIndex]
+                        console.log(currentColor)
+
+                        const colorName = getColorName(currentColor)
+
+                        console.log('Showing color: ', colorName)
+
+                        let message = {
+                            'type': 'colorNames',
+                            'name': colorName
+                        }
+
+                        room.socketForRoom.broadcastMessage(JSON.stringify(message))
+
+                        room.lightGroups.wallButtons.forEach((light) => {
+                            light.color = colorsSequence[currentColorIndex];
+                        });
+                        
+                        currentColorIndex++;
+
+                        if (currentColorIndex >= colorsSequence.length) {
+                            setTimeout(() => {
+                                clearInterval(showColorSequence);
+                                
+                                // TODO: Add another interval to change the shuffled colors after 3 seconds
+                                const shuffledColors = shuffleArray([...colors]);
+                                room.lightGroups.wallButtons.forEach((light, i) => {
+                                    light.color = shuffledColors[i]
+                                })
+                            }, 1000)
+                        }
+                    }, 1000)
+
+                    room.lightGroups.wallButtons.forEach((light, i) => {
+                        light.onClick = 'report';
+                        this.lightColorSequence[i] = colorsSequence[i % colorsSequence.length];
+                    }); 
+
+                    this.lightColorSequence.length = colorsSequence.length;
+                }
             }
+        }
 
-            // Sets up a timer that runs a function every 40 milliseconds
-            // There is an issue, where if we left the game on idle for too long,
-            // the game would stop running.
-            this.animationMetronome = setInterval(() =>{
-                this.updateCountdown()
-                this.updateShapes()
-                this.applyShapesOnLights()
-                room.sendLightsInstructionsIfIdle()
-            } , 1000/25)
+        if (this.animationMetronome) {
+            clearInterval(this.animationMetronome);
+        }
 
-            // TODO : PlaySound('321go.mp3') in the room but also sent to monitors via socket
-            this.gameStartedAt = Date.now()
-            this.status = 'running'
-            console.log('GameSession Started.');
+        // Sets up a timer that runs a function every 40 milliseconds
+        // There is an issue, where if we left the game on idle for too long,
+        // the game would stop running.
+        this.animationMetronome = setInterval(() =>{
+            this.updateCountdown()
+            this.updateShapes()
+            this.applyShapesOnLights()
+            room.sendLightsInstructionsIfIdle()
+        } , 1000/25)
+
+        // TODO : PlaySound('321go.mp3') in the room but also sent to monitors via socket
+
+        this.gameStartedAt = Date.now()
+        this.status = 'running'
+        console.log('GameSession Started.');
     }
 
+    // Handles the click event of a light in a game, it checks the room type, game rule, and level to determine the correct action to take based on the light's color and ID
+    // Actions include: losing a life, turning off the light, playing a sound, and completing a level
+    // TODO: Create an event for the continue button
     handleLightClickAction(lightId, whileColorWas){
         // We should assume that if the click event was reported, it means that the click was made during a period where that click actually meant something
         // That implies that we should always set the onClick as ignore is all the other cases (mostly black tiles)
@@ -782,9 +800,7 @@ class GameSession{
         let clickedLight = this.GetLightById(lightId)
         console.log('TEST: clickedLight '+lightId+' whileColorWas: '+ whileColorWas)
 
-        if(roomType === 'doubleGrid'){
-            // TODO: Refactor this code block into a Switch statement for a more cleaner code
-
+        if(roomType === 'doubleGrid'){ 
             if(this.rule === 1){
                 if(this.level === 1){
                     // Here we expect :
@@ -811,6 +827,7 @@ class GameSession{
                             }
 
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                            room.socketForMonitor.broadcastMessage(JSON.stringify(message))
 
                             this.ligthIdsSequence.splice(0, 1)
                             if(this.ligthIdsSequence.length === 0){
@@ -845,6 +862,7 @@ class GameSession{
                             }
 
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                            room.socketForMonitor.broadcastMessage(JSON.stringify(message))
 
                             this.ligthIdsSequence.splice(0, 1)
                             if(this.ligthIdsSequence.length === 0){
@@ -879,6 +897,7 @@ class GameSession{
                             }
 
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                            room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                             
                             this.ligthIdsSequence.splice(0, 1)
                             if(this.ligthIdsSequence.length === 0){
@@ -890,7 +909,7 @@ class GameSession{
                                 }
     
                                 room.socketForRoom.broadcastMessage(JSON.stringify(message))
-
+                                room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                                 this.endAndExit()   // End the game if its the last level
                             }
                         } else {
@@ -915,11 +934,19 @@ class GameSession{
                             }
         
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                            room.socketForMonitor.broadcastMessage(JSON.stringify(message))
         
                             this.lightColorSequence.splice(0, 1)
                             if(this.lightColorSequence.length === 0){
+                                // TODO: adjust levelCompleted to loop same level when roomType is 'basketballHoops'
+                                // let message = { 
+                                //     'type': 'levelCompleted',
+                                //     'message': 'Player Wins',
+                                //     'audio': 'levelCompleted'
+                                // }
+                        
+                                // room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                                 this.levelCompleted()
-                                //this.offerSameLevel()
                             }
                         } else {
                             this.removeLife()   // Deducts player life if wrong button number order is pushed
@@ -933,8 +960,6 @@ class GameSession{
 
     levelCompleted(){
         clearInterval(this.animationMetronome)          // Stop the animation
-        // TODO: room.playSound('level-completed')
-        // TODO: Display points on room screen
 
         let message = { 
             'type': 'levelCompleted',
@@ -943,21 +968,25 @@ class GameSession{
         }
 
         room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+        room.socketForMonitor.broadcastMessage(JSON.stringify(message))
 
-        if(room.waitingGameSession === undefined){
-            this.offerNextLevel()
-        }
-        else if(this.levelsStartedWhileSessionIsWaiting < 3){
-            this.offerNextLevel()
-        }
-        else{
-            let message = {
-                'type': 'gameEnded',
-                'message': 'Please leave the room',
+        if(roomType === 'basketballHoops'){
+            if(room.waitingGameSession === undefined){         
+                this.offerSameLevel()
             }
-            room.socketForRoom.broadcastMessage(JSON.stringify(message))
-
-            this.endAndExit()
+            else{
+                this.endAndExit()
+            }
+        } else if(roomType === 'doubleGrid'){ 
+            if(room.waitingGameSession === undefined){       
+                this.offerNextLevel()
+            }
+            else if(this.levelsStartedWhileSessionIsWaiting < 3){
+                this.offerNextLevel()
+            }
+            else{
+                this.endAndExit()
+            }
         }
     }
 
@@ -971,73 +1000,106 @@ class GameSession{
             'audio': 'levelFailed'
         }
 
-        //room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+        room.socketForMonitor.broadcastMessage(JSON.stringify(message))
         room.socketForRoom.broadcastMessage(JSON.stringify(message))
         
-        if(room.waitingGameSession === undefined){
-            let message = {
-                'type': 'playerLosing',
-                'message': 'Try again? Press the blinking light',
-            }
-            room.socketForRoom.broadcastMessage(JSON.stringify(message))
- 
-            // TODO: propose same level when button is clicked
+        if(room.waitingGameSession === undefined){         
             this.offerSameLevel()
         }
         else{
-            let message = {
-                'type': 'gameEnded',
-                'message': 'Please leave the room',
-            }
-            room.socketForRoom.broadcastMessage(JSON.stringify(message))
-
             this.endAndExit()
         }
 
     }
 
     offerSameLevel(){
-        // TODO : propose next level with countdown and push a button to accept
+        // TODO : propose same level with countdown and push a button to accept
+        let message = {
+            'type': 'offerSameLevel',
+            'message': 'Try again? Press the blinking light',
+            'countdown': this.prepTime 
+        }
+        room.socketForRoom.broadcastMessage(JSON.stringify(message))
+        
         this.startSameLevel()
     }
 
     offerNextLevel(){
         // TODO : propose next level with countdown and push a button to accept
+        let message = {
+            'type': 'offerNextLevel',
+            'message': 'Continue? Press the blinking light',
+            'countdown': this.prepTime 
+        }
+        room.socketForRoom.broadcastMessage(JSON.stringify(message))
+        
         this.startNextLevel()
     }
 
     async startSameLevel(){
-        const message = await room.socketForRoom.receiveMessage()
-        if(message.type === 'continue'){
-            if(room.waitingGameSession !== undefined){
-                this.levelsStartedWhileSessionIsWaiting ++
-            }
+        const receivedMessage = await room.socketForRoom.waitForMessage();
+        console.log('Received:', receivedMessage)
+        
+        if(room.waitingGameSession !== undefined){
+            this.levelsStartedWhileSessionIsWaiting ++
+        }
+        if(receivedMessage.type === 'continue'){
             this.reset()
             await this.prepare()
             this.start()
         }
+        else if(receivedMessage.type === 'exit'){
+            this.reset()
+            this.endAndExit()
+        }
     }
 
     async startNextLevel(){
+        const receivedMessage = await room.socketForRoom.waitForMessage();
+        console.log('Received:', receivedMessage)
+
         if(room.waitingGameSession !== undefined){
             this.levelsStartedWhileSessionIsWaiting ++
         }
-        this.level ++
-        this.reset()
-        await this.prepare()
-        this.start()
+        if(receivedMessage.type === 'continue'){
+            this.level ++
+            this.reset()
+            await this.prepare()
+            this.start()
+        }
+        else if(receivedMessage.type === 'exit'){
+            this.reset()
+            this.endAndExit()
+        }
+        
     }
 
     async endAndExit(){
         // TODO : await playing sound to say Byebye
+        let messageForRoom = {
+            'type': 'gameEnded',
+            'message': 'Please leave the room',
+        }
+        let messageForDoor = {
+            'type': 'gameEnded',
+            'message': 'Please enter the room',
+        }
+        room.socketForRoom.broadcastMessage(JSON.stringify(messageForRoom))
+        room.socketForMonitor.broadcastMessage(JSON.stringify(messageForRoom))
+        room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
+        this.prepTime = 20
         this.reset()
         if(room.waitingGameSession !== undefined){
             //room.currentGameSession = { ...room.waitingGameSession }
             room.currentGameSession = new GameSession(room.waitingGameSession.rule, room.waitingGameSession.level)
             room.waitingGameSession = undefined
             // TODO display "Please come in" on the door screen
+            // let message = {
+            //     'type': 'gameEnded',
+            //     'message': 'Please come in',
+            // }
+            // room.socketForDoor.broadcastMessage(JSON.stringify(message))
             await room.currentGameSession.init()
-        
         }
     }
 
@@ -1053,8 +1115,9 @@ class GameSession{
     }
 
     updateCountdown(){
+
         if (this.status === undefined) {
-            return; // Stops countdown updates when the game is not running
+            return;
         }
 
         let timeLeft = Math.round((this.lastLevelStartedAt + (this.timeForLevel * 1000) - Date.now()) / 1000)
@@ -1064,13 +1127,15 @@ class GameSession{
                 this.countdown = timeLeft
                 let message = {
                     'type':'updateCountdown',
-                    'countdown':this.countdown,
+                    'countdown':this.countdown
                 }
                 room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                room.socketForMonitor.broadcastMessage(JSON.stringify(message))
             }
             else{
                 let message = {'type':'timeIsUp'}
                 room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                 this.levelFailed()
             }
         }
@@ -1087,6 +1152,7 @@ class GameSession{
         } 
     }
 
+    // Sends a message to all connected clients in the room, updating the number of lives
     updateLifes(){
         let message = {
             'type':'updateLifes',
@@ -1099,9 +1165,12 @@ class GameSession{
         }
 
         room.socketForRoom.broadcastMessage(JSON.stringify(message))
+        room.socketForMonitor.broadcastMessage(JSON.stringify(message))
     }
 
+    // Updates the active status of shapes based on their activeUntil property and the current time
     updateShapes(){
+
         let now = Date.now()
 
         this.shapes.forEach((shape) => {
@@ -1114,8 +1183,13 @@ class GameSession{
                 }
             }
         })
+
     }
 
+    // Iterates over all the lights in the room and checks if each light is affected by animation.
+    // If it is, it checks if any of the shapes in the array intersects with the light
+    // If a shape intersects with the light, it sets the light's color and onClick property to the corresponding values from the shape
+    // If no shape intersects with the light, it sets the light's color and onClick property to default values
     applyShapesOnLights(){
         // scanning the shapes array reversly to focus on the last layer
         room.lights.forEach((light) => {
@@ -1147,6 +1221,7 @@ class GameSession{
             }
         })
     }
+
 }
 
 let room = new Room(roomType)

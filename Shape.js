@@ -1,3 +1,5 @@
+const { calculateDistance, mapValue } = require('./utils.js')
+
 class Shape{
     constructor(startPosX, startPosY, shape, width, height, color, onClick, pathDots, speed, affectsLightGroup, duration) { // Only rectangles for the moment
         this.active = true

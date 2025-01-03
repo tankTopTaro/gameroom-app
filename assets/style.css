@@ -1,0 +1,140 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    overflow: hidden;
+    background-color: rgb(43, 51, 55);
+}
+
+#gameStatus {
+    color: white;
+    font-size: 35px;
+}
+
+#room {
+    height: 100vh;
+    min-height: 100%;
+}
+
+#room #countdown {
+    font-size: 200px;
+}
+
+#room #rule, #room #level {
+    font-size: 50px;
+}
+
+#room #heart {
+    color: #EB2E60;
+    width: 100px;
+    height: 100px;
+}
+
+#room #heart-broken {
+    color: #424242;
+    width: 100px;
+    height: 100px;
+}
+
+.hideConfig {
+    display: none !important;
+}
+
+@keyframes shrinkAndFade {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(0);
+      opacity: 0;
+    }
+}
+
+@keyframes growAndFade {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.heart-broken {
+    animation: growAndFade 0.5s ease forwards;
+}
+  
+.heart-lost {
+    animation: shrinkAndFade 0.5s ease forwards;
+}
+  
+.room-message-container {
+    margin-bottom: 20px;
+    color: white;
+}
+
+#room-message {
+    font-size: 50px;
+}
+
+.pulse-button {
+    width: 200px;
+    height: 200px;
+    font-size: 1.3em;
+    font-weight: lighter;
+    font-family: 'Trebuchet MS', sans-serif;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 100px;
+    letter-spacing: -1px;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    background: #5a99d4;
+    cursor: pointer;
+    box-shadow: 0 0 0 0 rgba(90, 153, 212, 0.5);
+    animation: pulse 1.5s infinite;
+  }
+
+  .pulse-button-red {
+    width: 200px;
+    height: 200px;
+    font-size: 1.3em;
+    font-weight: lighter;
+    font-family: 'Trebuchet MS', sans-serif;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 100px;
+    letter-spacing: -1px;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    background: #EB2E60;
+    cursor: pointer;
+    box-shadow: 0 0 0 0 rgba(90, 153, 212, 0.5);
+    animation: pulse 1.5s infinite;
+  }
+  
+  .pulse-button:hover, .pulse-button-red:hover {
+    animation: none;
+  }
+  
+  @keyframes pulse {
+    0% {
+      transform: scale(0.9);
+    }
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 50px rgba(90, 153, 212, 0);
+    }
+    100% {
+      transform: scale(0.9);
+      box-shadow: 0 0 0 0 rgba(90, 153, 212, 0);
+    }
+  }
