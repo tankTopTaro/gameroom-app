@@ -394,7 +394,7 @@ class GameSession{
     async prepare(){  // prepares anything that is better to prepare and wait for the players input on a certain button (or a countdown to end)
         return new Promise((resolve,reject) => {
             console.log('preparation starts...');
-            this.prepTime = 20
+            this.prepTime = 5
             this.timeForLevel = 60
             this.countdown = this.timeForLevel
             this.lifes = 5      // At every level, the player starts with 5 lifes 
@@ -739,6 +739,7 @@ class GameSession{
                         }
 
                         room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                        room.socketForMonitor.broadcastMessage(JSON.stringify(message))
 
                         room.lightGroups.wallButtons.forEach((light) => {
                             light.color = colorsSequence[currentColorIndex];
@@ -1049,7 +1050,6 @@ class GameSession{
             this.start()
         }
         else if(receivedMessage.type === 'exit'){
-            this.reset()
             this.endAndExit()
         }
     }
@@ -1068,7 +1068,6 @@ class GameSession{
             this.start()
         }
         else if(receivedMessage.type === 'exit'){
-            this.reset()
             this.endAndExit()
         }
         
@@ -1076,31 +1075,31 @@ class GameSession{
 
     async endAndExit(){
         // TODO : await playing sound to say Byebye
-        let messageForRoom = {
-            'type': 'gameEnded',
-            'message': 'Please leave the room',
-        }
-        let messageForDoor = {
-            'type': 'gameEnded',
-            'message': 'Please enter the room',
-        }
-        room.socketForRoom.broadcastMessage(JSON.stringify(messageForRoom))
-        room.socketForMonitor.broadcastMessage(JSON.stringify(messageForRoom))
-        room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
-        this.prepTime = 20
-        this.reset()
-        if(room.waitingGameSession !== undefined){
-            //room.currentGameSession = { ...room.waitingGameSession }
-            room.currentGameSession = new GameSession(room.waitingGameSession.rule, room.waitingGameSession.level)
-            room.waitingGameSession = undefined
-            // TODO display "Please come in" on the door screen
-            // let message = {
-            //     'type': 'gameEnded',
-            //     'message': 'Please come in',
-            // }
-            // room.socketForDoor.broadcastMessage(JSON.stringify(message))
-            await room.currentGameSession.init()
-        }
+        console.log('Ending game session...')
+
+            let messageForRoom = {
+                'type': 'gameEnded',
+                'message': 'Please leave the room',
+            }
+            let messageForDoor = {
+                'type': 'gameEnded',
+                'message': 'Please enter the room',
+            }
+            room.socketForRoom.broadcastMessage(JSON.stringify(messageForRoom))
+            room.socketForMonitor.broadcastMessage(JSON.stringify(messageForRoom))
+            room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
+
+            this.reset()
+
+            if(room.waitingGameSession !== undefined){
+                //room.currentGameSession = { ...room.waitingGameSession }
+                //room.currentGameSession = new GameSession(room.waitingGameSession.rule, room.waitingGameSession.level)
+                room.currentGameSession = room.waitingGameSession   // ensures that room.currentGameSession is not just a shallow copy of room.waitingGameSession
+                room.waitingGameSession = undefined
+                await room.currentGameSession.init()
+            }
+
+            room.isFree = true  // Ensures that the room is available for a new game session
     }
 
     GetLightById(lightId){

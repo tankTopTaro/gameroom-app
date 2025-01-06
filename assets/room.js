@@ -1,10 +1,11 @@
 let socket = undefined
 let monitoringIsOn = true
-const playerHearts = 5
+let timerInterval = null
 
 const roomElement = document.getElementById('room-info')
 const lifesContainer = document.getElementById('lifes-container')
 const countdownElement = document.getElementById('countdown')
+const playerMessage = document.getElementById('player-alert')
 
 const heartSVG = `<svg id="heart" xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-heart">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -40,9 +41,17 @@ function startListenningToSocket(){
         if(json){
             if(json.type === 'newLevelStarts'){
                 let newGame = json  
-                console.log(newGame)
+                // clear everthing
+                reset()
                 
-                lifesContainer.innerHTML = ''
+                // Generate hearts based on 'newGame.lifes'
+                for (let i = 0; i < newGame.lifes; i++) {
+                    const heart = document.createElement('div');
+                    heart.classList.add('heart');
+                    heart.innerHTML = heartSVG;  // Insert the SVG directly
+                    lifesContainer.appendChild(heart);
+                }
+
                 roomElement.textContent = `Rule ${newGame.rule} - Level ${newGame.level}`
 
                 let prepTime = newGame.prepTime
@@ -71,16 +80,11 @@ function startListenningToSocket(){
                 updateTimer()
 
                 timerInterval = setInterval(updateTimer, 1000)
-
-                for(let i = 0; i < playerHearts; i++){
-                    const heart = document.createElement('div')
-                    heart.classList.add('heart')
-                    heart.innerHTML = heartSVG
-                    lifesContainer.appendChild(heart)
-                }
             }
             else if(json.type === 'updateLifes'){
                 let lifes = json.lifes
+
+                console.log('Updating lifes to:', lifes)
 
                 const hearts = lifesContainer.querySelectorAll('.heart')
 
@@ -106,7 +110,7 @@ function startListenningToSocket(){
                 }
 
                 if(lifes === 0){
-                    setTimeout(gameOver, 2000)
+                    setTimeout(reset, 2000)
                 }
             }
             else if(json.type === 'updateCountdown'){
@@ -268,20 +272,16 @@ function startListenningToSocket(){
                 }, countdown * 1000)
             }
             else if(json.type === 'gameEnded'){
-                const playerMessage = document.getElementById('player-alert')
-                roomElement.textContent = ''
-                countdownElement.textContent = '00:00'
                 playerMessage.textContent = json.message
                 setTimeout(() => {
-                    playerMessage.textContent = ''
-                    for(let i = 0; i < playerHearts; i++){
-                        const heart = document.createElement('div')
-                        heart.classList.add('heart')
-                        heart.innerHTML = heartSVG
-                        lifesContainer.appendChild(heart)
+                    reset()
+                    for (let i = 0; i < 5; i++) {
+                        const heart = document.createElement('div');
+                        heart.classList.add('heart');
+                        heart.innerHTML = heartSVG;  // Insert the SVG directly
+                        lifesContainer.appendChild(heart);
                     }
-                },5000) 
-                console.log(json)
+                },5000)
             }
         }
 
@@ -313,9 +313,12 @@ function startListenningToSocket(){
     });
 }
 
-function gameOver() {
-    lifesContainer.innerHTML = '';
-    countdownElement.textContent = '00:00';
+function reset() {
+    clearInterval(timerInterval)
+    roomElement.textContent = ''
+    countdownElement.textContent = '00:00'
+    playerMessage.textContent = ''
+    lifesContainer.innerHTML = ''
 }
 
 async function fetchAudio(soundName) {

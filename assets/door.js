@@ -5,9 +5,10 @@ const players = {
 }
 
 const startGameBtn = document.getElementById('startGameBtn');
-const levelOneBtn = document.getElementById('levelOneBtn');
-const levelTwoBtn = document.getElementById('levelTwoBtn');
-const levelThreeBtn = document.getElementById('levelThreeBtn');
+const basketBallLevelOneBtn = document.getElementById('basketBallLevelOneBtn');
+const doubleGridLevelOneBtn = document.getElementById('doubleGridLevelOneBtn');
+const doubleGridLevelTwoBtn = document.getElementById('doubleGridLevelTwoBtn');
+const doubleGridLevelThreeBtn = document.getElementById('doubleGridLevelThreeBtn');
 const roomMessage = document.getElementById('roomMessage');
 const basketballHoopsRoom = document.getElementById('basketballHoopsRoom')
 const doubleGridRoom = document.getElementById('doubleGridRoom')
@@ -50,7 +51,7 @@ function startListenningToSocket(socket){
                     clearInterval(timerInterval)
                     timerInterval=null
                 }
-                console.log(data)
+                console.log('newGame', data)
                 // Move waiting players to current players
                 players.room.push(...players.waiting); // Move all waiting players to the room
                 players.waiting = []; // Clear the waiting list
@@ -189,9 +190,10 @@ function handleLevelSelection(event) {
     selectedLevelBtn.classList.add('btn-danger');
 }
 
-levelOneBtn.addEventListener('click', handleLevelSelection);
-levelTwoBtn.addEventListener('click', handleLevelSelection);
-levelThreeBtn.addEventListener('click', handleLevelSelection);
+basketBallLevelOneBtn.addEventListener('click', handleLevelSelection);
+doubleGridLevelOneBtn.addEventListener('click', handleLevelSelection);
+doubleGridLevelTwoBtn.addEventListener('click', handleLevelSelection);
+doubleGridLevelThreeBtn.addEventListener('click', handleLevelSelection);
 
 const XSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-x">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />

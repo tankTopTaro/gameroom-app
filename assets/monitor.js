@@ -194,6 +194,8 @@ function startListenningToSocket(){
                 let prepTime = newGame.prepTime
                 let remainingTime = prepTime
 
+                console.log('newGame', newGame)
+
                 const updateTimer = () => {
                     let minutes = Math.floor(remainingTime / 60)
                     let seconds = remainingTime % 60
