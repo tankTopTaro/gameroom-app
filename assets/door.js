@@ -5,20 +5,22 @@ const players = {
 }
 
 const startGameBtn = document.getElementById('startGameBtn');
-const basketBallLevelOneBtn = document.getElementById('basketBallLevelOneBtn');
-const doubleGridLevelOneBtn = document.getElementById('doubleGridLevelOneBtn');
-const doubleGridLevelTwoBtn = document.getElementById('doubleGridLevelTwoBtn');
-const doubleGridLevelThreeBtn = document.getElementById('doubleGridLevelThreeBtn');
+const confirmBtn = document.getElementById('confirmBtn');
+
+const levelOneBtns = document.querySelectorAll('.level-one');
+const levelTwoBtns = document.querySelectorAll('.level-two');
+const levelThreeBtns = document.querySelectorAll('.level-three');
+
 const roomMessage = document.getElementById('roomMessage');
 const basketballHoopsRoom = document.getElementById('basketballHoopsRoom')
 const doubleGridRoom = document.getElementById('doubleGridRoom')
 const countdownElement = document.getElementById('countdown')
+const roomConfig = document.getElementById('roomConfig')
 
 let selectedLevelBtn = null;
 let selectedLevelValue = null;
 let timerInterval = null;
 let waitingTime = 300;
-let gameIsActive = false;
 
 // TODO: figure out a way to persist the data
 function startListenningToSocket(socket){
@@ -58,26 +60,32 @@ function startListenningToSocket(socket){
                 renderPlayerData(players.room, 'player-room'); // Re-render current players
                 renderPlayerData(players.waiting, 'player-waiting'); // Re-render waiting players (empty)
                 roomMessage.textContent = json.message
-                gameIsActive = true
                 startWaitingTimer()
             }
             if(json.type === 'gameSessionInitialized'){
                 roomMessage.textContent = json.message
             }
             if(json.type === 'gameEnded'){
-                console.log('game ended')
-                gameIsActive = false
-                if(timerInterval) {
-                    clearInterval(timerInterval)
-                    timerInterval = null
-                }
-                countdownElement.textContent = '00:00'
+                console.log(json.message)
+                // reset the screen to defaults
                 players.room = []
-                renderPlayerData(players.room, 'player-room');
+                renderPlayerData(players.room, 'player-room')
                 roomMessage.textContent = json.message
-                doubleGridRoom.classList.add('hideConfig')
-                basketballHoopsRoom.classList.add('hideConfig')
-                startGameBtn.textContent = ''
+                countdownElement.textContent = '00:00'
+
+                if(timerInterval){
+                    clearInterval(timerInterval)
+                    timerInterval=null
+                }
+
+                roomConfig.classList.remove('roomConfigVisible');
+                roomConfig.classList.add('roomConfigHidden');
+
+                basketballHoopsRoom.classList.remove('showConfig');
+                basketballHoopsRoom.classList.add('hideConfig');
+
+                doubleGridRoom.classList.remove('showConfig');
+                doubleGridRoom.classList.add('hideConfig');
             }
         }
     });
@@ -102,6 +110,12 @@ function startListenningToSocket(socket){
 function renderDoorData(data){
     const roomType = data.roomData
     const player = data.playerData
+
+    if(players.waiting.length >= 6) {
+        console.log('Player limit reached.')
+        return;
+    }
+    
     players.waiting.push(player)
     renderPlayerData(players.waiting, 'player-waiting');
     renderRoomConfig(roomType)
@@ -113,18 +127,13 @@ function renderPlayerData(playerList, containerId) {
 
     playerList.forEach(player => {
         const listItem = document.createElement('li');
-        listItem.style.display = 'flex';
-        listItem.style.alignItems = 'center';
-        listItem.style.marginBottom = '10px';
+        listItem.classList.add('list-item')
 
         // Create an image element for the avatar
         const avatarImg = document.createElement('img');
         avatarImg.src = player.playerAvatar || 'default-avatar.png';
         avatarImg.alt = `${player.nickname || 'Unknown'}'s avatar`;
-        avatarImg.style.width = '50px';
-        avatarImg.style.height = '50px';
-        avatarImg.style.borderRadius = '50%';
-        avatarImg.style.marginRight = '10px';
+        avatarImg.classList.add('avatar');
 
         // Create a span for the player's details
         const playerDetails = document.createElement('span');
@@ -140,18 +149,34 @@ function renderPlayerData(playerList, containerId) {
 }
 
 function renderRoomConfig(roomType){
+    // Slide the roomConfig into view
+    roomConfig.classList.remove('roomConfigHidden');
+    roomConfig.classList.add('roomConfigVisible');
+
     // Hide both rooms initially
+    basketballHoopsRoom.classList.remove('showConfig');
     basketballHoopsRoom.classList.add('hideConfig');
+    doubleGridRoom.classList.remove('showConfig');
     doubleGridRoom.classList.add('hideConfig');
 
+    if(selectedLevelBtn){
+        selectedLevelBtn.classList.remove('btn-danger');
+        selectedLevelBtn.classList.add('btn-primary');
+        selectedLevelBtn = null;
+        selectedLevelValue = null;
+    }
+
     startGameBtn.textContent = 'Submit';
+    startGameBtn.classList.remove('disabled')
     
     if (roomType === 'doubleGrid'){
         // only show the doubleGridRoom
         doubleGridRoom.classList.remove('hideConfig');
+        doubleGridRoom.classList.add('showConfig');
     } else if (roomType === 'basketballHoops'){
         // only show the basketballHoopsRoom
-        basketballHoopsRoom.classList.remove('hideConfig');       
+        basketballHoopsRoom.classList.remove('hideConfig');
+        basketballHoopsRoom.classList.add('showConfig');      
     }
 }
 
@@ -177,23 +202,39 @@ async function submitRoomConfig(rule, level){
 }
 
 function handleLevelSelection(event) {
-    console.log(selectedLevelBtn)
-    if(selectedLevelBtn){
+    const clickedButton = event.target;
+    console.log('Clicked button:', clickedButton);
+    console.log('Button level:', clickedButton.getAttribute('data-level'));
+
+    if (selectedLevelBtn) {
         selectedLevelBtn.classList.remove('btn-danger');
         selectedLevelBtn.classList.add('btn-primary');
     }
 
-    selectedLevelBtn = event.target;
-    selectedLevelValue = selectedLevelBtn.getAttribute('data-level');
+    if (selectedLevelBtn === clickedButton) {
+        selectedLevelBtn.classList.remove('btn-danger');
+        selectedLevelBtn.classList.add('btn-primary');
+        selectedLevelBtn = null;
+        selectedLevelValue = null;
+        return;
+    }
 
+    selectedLevelBtn = clickedButton;
+    selectedLevelValue = selectedLevelBtn.getAttribute('data-level');
     selectedLevelBtn.classList.remove('btn-primary');
     selectedLevelBtn.classList.add('btn-danger');
 }
 
-basketBallLevelOneBtn.addEventListener('click', handleLevelSelection);
-doubleGridLevelOneBtn.addEventListener('click', handleLevelSelection);
-doubleGridLevelTwoBtn.addEventListener('click', handleLevelSelection);
-doubleGridLevelThreeBtn.addEventListener('click', handleLevelSelection);
+levelOneBtns.forEach(button => {
+    button.addEventListener('click', handleLevelSelection);
+});
+levelTwoBtns.forEach(button => {
+    button.addEventListener('click', handleLevelSelection);
+});
+levelThreeBtns.forEach(button => {
+    button.addEventListener('click', handleLevelSelection);
+});
+
 
 const XSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-x">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -205,12 +246,25 @@ startGameBtn.addEventListener('click', () => {
     let selectedRuleValue = 1;
 
     if(selectedLevelValue) {
-         // Move players from the lobby to the room
+        // Open the modal if a level is selected
+        // const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        // confirmModal.show();
 
+         // Move players from the lobby to the room
          if (players.room.length === 0) {
             players.room = [...players.room, ...players.waiting]; // Add all waiting players to the room
             players.waiting = []; // Clear the waiting list
          }
+
+        // Hide room config and buttons
+        roomConfig.classList.remove('roomConfigVisible');
+        roomConfig.classList.add('roomConfigHidden');
+        basketballHoopsRoom.classList.remove('showConfig');
+        basketballHoopsRoom.classList.add('hideConfig');
+        doubleGridRoom.classList.remove('showConfig');
+        doubleGridRoom.classList.add('hideConfig');
+        startGameBtn.textContent = '';
+        startGameBtn.classList.add('disabled')
  
         // Re-render both lists 
         renderPlayerData(players.waiting, 'player-waiting');

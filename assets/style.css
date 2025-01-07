@@ -115,9 +115,65 @@ html, body {
     font-size: 50px;
 }
 
+/* Door list items */
+#player-room, #player-waiting {
+    list-style: none; 
+    padding: 0;       
+    margin: 0;        
+    display: flex;    
+    flex-direction: column; 
+    align-items: center;    
+    height: 100%;     
+    gap: 15px;
+}
+
+#player-room .list-item, #player-waiting .list-item {   
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+    background-color: #222; 
+    padding: 10px; 
+    border-radius: 8px; 
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+    text-align: center;
+}
+
+#player-room .avatar, #player-waiting .avatar {
+    width: 50px;  
+    height: 50px; 
+    object-fit: cover; 
+}
+
+#player-room span, #player-waiting span {
+    color: #fff; 
+    font-size: 14px; 
+}
+
+/* Initial Hidden State */
+.roomConfigHidden {
+    transform: translateY(100%);
+    transition: transform 0.5s ease, opacity 0.5s ease;
+    min-height: 80px;
+}
+
+/* Visible State */
+.roomConfigVisible {
+    transform: translateY(0);
+    min-height: 200px;
+    transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
 /* Hide Config */
 .hideConfig {
-    display: none !important;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+  
+.showConfig {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 /* Pulse Button */
@@ -213,3 +269,93 @@ html, body {
         box-shadow: 0 0 0 0 var(--button-red-shadow);
     }
 }
+
+.circle::before, .circle::after {
+    position: absolute;
+    content: '';
+    border-radius: inherit;
+    background-image: conic-gradient(#00dbde, #fc00ff, #00dbde);
+    inset: 0px;
+    z-index: -1;
+    /* animation: rotate 3s linear infinite; */
+}
+
+.circle:hover::before, .circle:hover::after {
+    animation-play-state: paused;
+}
+
+.circle::after {
+    filter: blur(0.3rem);
+    opacity: 0.7;
+}
+
+@keyframes rotate {
+    to {
+        rotate: 360deg;
+    }
+}
+
+.helpInfo svg {
+    cursor: pointer;
+    transition: color 0.3s ease;
+    color: #fff;
+}
+
+.helpInfo svg:hover {
+    color: var(--heart-color);
+}
+
+.light-red {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background-color: var(--button-red);
+    margin: 8px;
+  }
+
+  .light-blue {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background-color: var(--button-blue);
+    margin: 8px;
+  }
+  
+  .red-light-animated {
+    animation-duration: 2s;
+    animation-name: flashing-red;
+  }
+
+  .blue-light-animated {
+    animation-duration: 2s;
+    animation-name: flashing-blue;
+  }
+
+  @keyframes flashing-red {
+    0% {
+      box-shadow: none;
+    }
+    50% {
+      box-shadow: 0px 0px 40px var(--button-red-shadow), 0px 0px 30px var(--button-red-shadow),
+        0px 0px 20px var(--button-red-shadow), 0px 0px 10px var(--button-red-shadow),
+        0px 0px 5px var(--button-red-shadow);
+    }
+    100% {
+      box-shadow: none;
+    }
+  }
+  
+  @keyframes flashing-blue {
+    0% {
+      box-shadow: none;
+    }
+    50% {
+      box-shadow: 0px 0px 40px var(--button-blue-shadow), 0px 0px 30px var(--button-blue-shadow),
+        0px 0px 20px var(--button-blue-shadow), 0px 0px 10px var(--button-blue-shadow),
+        0px 0px 5px var(--button-blue-shadow);
+    }
+    100% {
+      box-shadow: none;
+    }
+  }
+  

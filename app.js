@@ -902,8 +902,8 @@ class GameSession{
                             
                             this.ligthIdsSequence.splice(0, 1)
                             if(this.ligthIdsSequence.length === 0){
-                                // this.levelCompleted()
-                                let message = {
+                                this.levelCompleted()
+                                /* let message = {
                                     type: 'levelCompleted',
                                     audio: 'levelCompleted',
                                     message: 'Player Wins'
@@ -911,7 +911,7 @@ class GameSession{
     
                                 room.socketForRoom.broadcastMessage(JSON.stringify(message))
                                 room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                                this.endAndExit()   // End the game if its the last level
+                                this.endAndExit() */   // End the game if its the last level
                             }
                         } else {
                             this.removeLife()   // Deducts player life if wrong button number order is pushed
@@ -940,13 +940,6 @@ class GameSession{
                             this.lightColorSequence.splice(0, 1)
                             if(this.lightColorSequence.length === 0){
                                 // TODO: adjust levelCompleted to loop same level when roomType is 'basketballHoops'
-                                // let message = { 
-                                //     'type': 'levelCompleted',
-                                //     'message': 'Player Wins',
-                                //     'audio': 'levelCompleted'
-                                // }
-                        
-                                // room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                                 this.levelCompleted()
                             }
                         } else {
@@ -971,23 +964,14 @@ class GameSession{
         room.socketForMonitor.broadcastMessage(JSON.stringify(message))
         room.socketForMonitor.broadcastMessage(JSON.stringify(message))
 
-        if(roomType === 'basketballHoops'){
-            if(room.waitingGameSession === undefined){         
-                this.offerSameLevel()
-            }
-            else{
-                this.endAndExit()
-            }
-        } else if(roomType === 'doubleGrid'){ 
-            if(room.waitingGameSession === undefined){       
-                this.offerNextLevel()
-            }
-            else if(this.levelsStartedWhileSessionIsWaiting < 3){
-                this.offerNextLevel()
-            }
-            else{
-                this.endAndExit()
-            }
+        if(room.waitingGameSession === undefined){       
+            this.offerNextLevel()
+        }
+        else if(this.levelsStartedWhileSessionIsWaiting < 3){
+            this.offerNextLevel()
+        }
+        else{
+            this.endAndExit()
         }
     }
 
@@ -1075,31 +1059,29 @@ class GameSession{
 
     async endAndExit(){
         // TODO : await playing sound to say Byebye
-        console.log('Ending game session...')
-
-            let messageForRoom = {
+        console.log('Ending game...')
+        let messageForRoom = {
                 'type': 'gameEnded',
                 'message': 'Please leave the room',
+                // 'audio': 'ByeBye'
             }
             let messageForDoor = {
                 'type': 'gameEnded',
                 'message': 'Please enter the room',
+                // 'audio': 'PleaseEnter'
             }
             room.socketForRoom.broadcastMessage(JSON.stringify(messageForRoom))
             room.socketForMonitor.broadcastMessage(JSON.stringify(messageForRoom))
             room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
-
-            this.reset()
-
-            if(room.waitingGameSession !== undefined){
-                //room.currentGameSession = { ...room.waitingGameSession }
-                //room.currentGameSession = new GameSession(room.waitingGameSession.rule, room.waitingGameSession.level)
-                room.currentGameSession = room.waitingGameSession   // ensures that room.currentGameSession is not just a shallow copy of room.waitingGameSession
-                room.waitingGameSession = undefined
-                await room.currentGameSession.init()
-            }
-
-            room.isFree = true  // Ensures that the room is available for a new game session
+        this.reset()
+        room.isFree = true  // Ensures that the room is available for a new game session
+        if(room.waitingGameSession !== undefined){
+            //room.currentGameSession = { ...room.waitingGameSession }
+            //room.currentGameSession = new GameSession(room.waitingGameSession.rule, room.waitingGameSession.level)
+            room.currentGameSession = room.waitingGameSession
+            room.waitingGameSession = undefined
+            await room.currentGameSession.init()
+        }
     }
 
     GetLightById(lightId){
@@ -1160,6 +1142,10 @@ class GameSession{
         };
 
         if (this.lifes === 0) {
+            let gameOverMessage = {
+                'type': 'noMoreLifes',
+            }
+            room.socketForRoom.broadcastMessage(JSON.stringify(gameOverMessage))
             this.levelFailed()
         }
 

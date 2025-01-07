@@ -32,18 +32,43 @@
         <div class="room-message-container d-none flex-column align-items-center justify-content-center">
             <span id="room-message" class="text-center py-4"></span>
             <span id="choice-timer" class="text-center py-4"></span>
-            <div class="d-flex">
-                <button id="continue-button" class="pulse-button">
-                    Continue?
-                </button>
-                <button id="no-button" class="pulse-button-red">
-                    No
-                </button>
+            <div class="d-flex align-items-a justify-content-center gap-4">
+                <div class="light-blue d-flex justify-content-center align-items-center">
+                    <button id="continue-button" class="btn outline-none text-white fs-2">Continue</button>
+                </div>
+                <div class="light-red d-flex justify-content-center align-items-center">
+                    <button id="no-button" class="btn outline-none text-white fs-2">No</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script src="room.js"></script>
+    <script>
+        function animateLight() {
+            const redlights = document.querySelectorAll(".light-red");
+            redlights.forEach(light => {
+                light.addEventListener("animationend", () => {
+                light.classList.remove("red-light-animated");
+            });
+            })
+            redlights.forEach(light => {
+                light.classList.add("red-light-animated");
+            })
+
+            const bluelights = document.querySelectorAll(".light-blue");
+            bluelights.forEach(light => {
+                light.addEventListener("animationend", () => {
+                light.classList.remove("blue-light-animated");
+            });
+            })
+            bluelights.forEach(light => {
+                light.classList.add("blue-light-animated");
+            })
+        }
+
+        let intervalId = window.setInterval(animateLight, 10)
+    </script>
 </body>
 </html>

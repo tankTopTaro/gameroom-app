@@ -1,6 +1,7 @@
 let socket = undefined
 let monitoringIsOn = true
 let timerInterval = null
+let isGameOver = false
 
 const roomElement = document.getElementById('room-info')
 const lifesContainer = document.getElementById('lifes-container')
@@ -41,21 +42,38 @@ function startListenningToSocket(){
         if(json){
             if(json.type === 'newLevelStarts'){
                 let newGame = json  
-                // clear everthing
-                reset()
+                console.log('newLevelStarts', newGame)
+                console.log('Current lifesContainer content:', lifesContainer.innerHTML)
                 
                 // Generate hearts based on 'newGame.lifes'
-                for (let i = 0; i < newGame.lifes; i++) {
-                    const heart = document.createElement('div');
-                    heart.classList.add('heart');
-                    heart.innerHTML = heartSVG;  // Insert the SVG directly
-                    lifesContainer.appendChild(heart);
+                if(isGameOver) {
+                    setTimeout(() => {
+                        lifesContainer.innerHTML = ''
+                        for (let i = 0; i < newGame.lifes; i++) {
+                            const heart = document.createElement('div');
+                            heart.classList.add('heart');
+                            heart.innerHTML = heartSVG;  // Insert the SVG directly
+                            lifesContainer.appendChild(heart);
+                        }
+                    }, 2000)
+                } else {
+                    lifesContainer.innerHTML = ''
+                    for (let i = 0; i < newGame.lifes; i++) {
+                        const heart = document.createElement('div');
+                        heart.classList.add('heart');
+                        heart.innerHTML = heartSVG;  // Insert the SVG directly
+                        lifesContainer.appendChild(heart);
+                    }
                 }
 
-                roomElement.textContent = `Rule ${newGame.rule} - Level ${newGame.level}`
+                roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`
 
                 let prepTime = newGame.prepTime
                 let remainingTime = prepTime
+                if(timerInterval) {
+                    clearInterval(timerInterval)
+                    timerInterval = null
+                }
 
                 const updateTimer = () => {
                     let minutes = Math.floor(remainingTime / 60)
@@ -108,10 +126,13 @@ function startListenningToSocket(){
                         }, 500); // Match the animation duration
                     }
                 }
-
-                if(lifes === 0){
-                    setTimeout(reset, 2000)
-                }
+            }
+            else if(json.type === 'noMoreLifes') {
+                isGameOver = true
+                setTimeout(() => {
+                    lifesContainer.innerHTML = ''
+                }, 2000)
+                
             }
             else if(json.type === 'updateCountdown'){
                 let countdown = json.countdown
@@ -125,80 +146,8 @@ function startListenningToSocket(){
                     countdownElement.textContent = `${minutes}:${seconds}`
                 }
             }
-            else if(json.type === 'offerSameLevel'){
-                console.log(json.message)
-                // hide the hud then show the message
-                const hud = document.querySelector('.hud');
-                const roomMessageContainer = document.querySelector('.room-message-container');
-                const roomMessage = document.getElementById('room-message')
-                roomMessage.textContent = json.message
-                const countdown = json.countdown
-
-                // Hide the HUD
-                setTimeout(() => {
-                    if (hud) {
-                        hud.classList.remove('d-flex')
-                        hud.classList.add('d-none')
-                    }
-    
-                    if (roomMessageContainer) {
-                        roomMessageContainer.classList.remove('d-none');
-                        roomMessageContainer.classList.add('d-flex');
-                    }
-                }, 2000)
-
-                const continueBtn = document.getElementById('continue-button')
-                if (continueBtn) {
-                    continueBtn.addEventListener('click', () => {
-                        const message = {
-                            'type': 'continue'
-                        };
-            
-                        // Send the message via the socket
-                        socket.send(JSON.stringify(message));
-            
-                        // Hide the room message and show the HUD again
-                        if (roomMessageContainer) {
-                            roomMessageContainer.classList.remove('d-flex');
-                            roomMessageContainer.classList.add('d-none');
-                        }
-            
-                        if (hud) {
-                            hud.classList.remove('d-none');
-                            hud.classList.add('d-flex');
-                        }
-                    });
-                }
-
-                const noBtn = document.getElementById('no-button')
-                if (noBtn) {
-                    noBtn.addEventListener('click', () => {
-                        const message = {
-                            'type': 'exit'
-                        };
-            
-                        // Send the message via the socket
-                        socket.send(JSON.stringify(message));
-            
-                        // Hide the room message and show the HUD again
-                        if (roomMessageContainer) {
-                            roomMessageContainer.classList.remove('d-flex');
-                            roomMessageContainer.classList.add('d-none');
-                        }
-            
-                        if (hud) {
-                            hud.classList.remove('d-none');
-                            hud.classList.add('d-flex');
-                        }
-                    });
-                }
-                
-                setTimeout(() => {
-                    noBtn.click()
-                }, countdown * 1000)
-
-            }
-            else if(json.type === 'offerNextLevel'){
+            else if(json.type === 'offerSameLevel' || 
+                json.type === 'offerNextLevel'){
                 console.log(json.message)
                 // hide the hud then show the message
                 const hud = document.querySelector('.hud');
@@ -206,20 +155,16 @@ function startListenningToSocket(){
                 const roomMessage = document.getElementById('room-message')
                 roomMessage.textContent = json.message
 
-                const countdown = json.countdown
-
                 // Hide the HUD
-                setTimeout(() => {
-                    if (hud) {
-                        hud.classList.remove('d-flex')
-                        hud.classList.add('d-none')
-                    }
-    
-                    if (roomMessageContainer) {
-                        roomMessageContainer.classList.remove('d-none');
-                        roomMessageContainer.classList.add('d-flex');
-                    }
-                }, 2000)
+                if (hud) {
+                    hud.classList.remove('d-flex')
+                    hud.classList.add('d-none')
+                }
+
+                if (roomMessageContainer) {
+                    roomMessageContainer.classList.remove('d-none');
+                    roomMessageContainer.classList.add('d-flex');
+                }
 
                 const continueBtn = document.getElementById('continue-button')
                 if (continueBtn) {
@@ -269,19 +214,16 @@ function startListenningToSocket(){
 
                 setTimeout(() => {
                     noBtn.click()
-                }, countdown * 1000)
+                }, 3000)
             }
             else if(json.type === 'gameEnded'){
+                console.log(json.message)
                 playerMessage.textContent = json.message
                 setTimeout(() => {
-                    reset()
-                    for (let i = 0; i < 5; i++) {
-                        const heart = document.createElement('div');
-                        heart.classList.add('heart');
-                        heart.innerHTML = heartSVG;  // Insert the SVG directly
-                        lifesContainer.appendChild(heart);
-                    }
-                },5000)
+                    playerMessage.textContent = ''
+                    roomMessage.textContent = ''
+                    lifesContainer.innerHTML = ''
+                }, 2000)
             }
         }
 
@@ -311,14 +253,6 @@ function startListenningToSocket(){
             // PrepareRoom()
         }
     });
-}
-
-function reset() {
-    clearInterval(timerInterval)
-    roomElement.textContent = ''
-    countdownElement.textContent = '00:00'
-    playerMessage.textContent = ''
-    lifesContainer.innerHTML = ''
 }
 
 async function fetchAudio(soundName) {
