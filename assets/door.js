@@ -60,10 +60,21 @@ function startListenningToSocket(socket){
                 renderPlayerData(players.room, 'player-room'); // Re-render current players
                 renderPlayerData(players.waiting, 'player-waiting'); // Re-render waiting players (empty)
                 roomMessage.textContent = json.message
-                startWaitingTimer()
+                //startWaitingTimer() // remove the countdown here
             }
             if(json.type === 'gameSessionInitialized'){
                 roomMessage.textContent = json.message
+            }
+            if(json.type === 'updateDoorCountdown'){
+                console.log('updateDoorCountdown', json.countdown)
+                let countdown = json.countdown
+                let minutes = Math.floor(countdown / 60)
+                let seconds = countdown % 60
+
+                minutes = minutes < 10 ? '0' + minutes : minutes
+                seconds = seconds < 10 ? '0' + seconds : seconds
+
+                countdownElement.textContent = `${minutes}:${seconds}`
             }
             if(json.type === 'gameEnded'){
                 console.log(json.message)

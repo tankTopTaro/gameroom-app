@@ -191,7 +191,7 @@ function startListenningToSocket(){
                 let rule = newGame.rule
                 let level = newGame.level
 
-                let prepTime = newGame.prepTime
+                /* let prepTime = newGame.prepTime
                 let remainingTime = prepTime
 
                 console.log('newGame', newGame)
@@ -218,13 +218,16 @@ function startListenningToSocket(){
 
                 updateTimer()
 
-                timerInterval = setInterval(updateTimer, 1000)
+                timerInterval = setInterval(updateTimer, 1000) */
 
                 setTimeout(() => {
                     lifesElement.textContent = newGame.lifes
                     statusElement.textContent = ''
                     roomElement.textContent = 'Room: ' + roomType + ' Rule: ' + rule + ' Level: ' + level
                 }, 1000)
+            }
+            if(json.type === 'newLevelCountdown'){
+                console.log(json.audio)
             }
             if(json.type === 'colorNames'){
                 let color = json

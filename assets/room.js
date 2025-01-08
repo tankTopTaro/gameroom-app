@@ -68,7 +68,7 @@ function startListenningToSocket(){
 
                 roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`
 
-                let prepTime = newGame.prepTime
+                /* let prepTime = newGame.prepTime
                 let remainingTime = prepTime
                 if(timerInterval) {
                     clearInterval(timerInterval)
@@ -97,7 +97,11 @@ function startListenningToSocket(){
 
                 updateTimer()
 
-                timerInterval = setInterval(updateTimer, 1000)
+                timerInterval = setInterval(updateTimer, 1000) */
+            }
+            else if(json.type === 'newLevelCountdown'){
+                console.log(json.audio)
+                fetchAudio(json.audio)
             }
             else if(json.type === 'updateLifes'){
                 let lifes = json.lifes
@@ -142,7 +146,7 @@ function startListenningToSocket(){
                 minutes = minutes < 10 ? '0' + minutes : minutes
                 seconds = seconds < 10 ? '0' + seconds : seconds
 
-                if(countdown < 61){
+                if(countdown <= 60){
                     countdownElement.textContent = `${minutes}:${seconds}`
                 }
             }

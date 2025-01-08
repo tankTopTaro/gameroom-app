@@ -394,8 +394,10 @@ class GameSession{
     async prepare(){  // prepares anything that is better to prepare and wait for the players input on a certain button (or a countdown to end)
         return new Promise((resolve,reject) => {
             console.log('preparation starts...');
-            this.prepTime = 5
-            this.timeForLevel = 60
+            // this.prepTime = 5
+            this.timeForLevel = 63
+            this.timeForWaiting = 300
+            this.doorCountdown = this.timeForWaiting
             this.countdown = this.timeForLevel
             this.lifes = 5      // At every level, the player starts with 5 lifes 
             this.lastLifeLostAt = 0
@@ -405,9 +407,9 @@ class GameSession{
                 'level':this.level,
                 'lifes':this.lifes,
                 'countdown':this.countdown,
-                'prepTime':this.prepTime,
+                // 'prepTime':this.prepTime,
                 'message': 'Please enter the room',
-                'audio': '321go'
+                //'audio': '321go'
             }
 
             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -426,7 +428,7 @@ class GameSession{
                     reject(e);
                 }
 
-            }, this.prepTime * 1000);
+            }, 1000);
         });
     }
 
@@ -774,17 +776,21 @@ class GameSession{
             clearInterval(this.animationMetronome);
         }
 
-        // Sets up a timer that runs a function every 40 milliseconds
-        // There is an issue, where if we left the game on idle for too long,
-        // the game would stop running.
         this.animationMetronome = setInterval(() =>{
             this.updateCountdown()
+            this.updateDoorCountdown()
             this.updateShapes()
             this.applyShapesOnLights()
             room.sendLightsInstructionsIfIdle()
         } , 1000/25)
 
         // TODO : PlaySound('321go.mp3') in the room but also sent to monitors via socket
+        let message = {
+            'type': 'newLevelCountdown',
+            'audio': '321go'
+        }
+        room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+        room.socketForRoom.broadcastMessage(JSON.stringify(message))
 
         this.gameStartedAt = Date.now()
         this.status = 'running'
@@ -1118,6 +1124,25 @@ class GameSession{
                 room.socketForRoom.broadcastMessage(JSON.stringify(message))
                 room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                 this.levelFailed()
+            }
+        }
+    }
+
+    updateDoorCountdown(){
+        let timeLeft = Math.round((this.lastLevelStartedAt + (this.timeForWaiting * 1000) - Date.now()) / 1000)
+
+        if( timeLeft !== this.doorCountdown ){
+            if(timeLeft >= 0){
+                this.doorCountdown = timeLeft
+                let message = {
+                    'type':'updateDoorCountdown',
+                    'countdown':this.doorCountdown
+                }
+                room.socketForDoor.broadcastMessage(JSON.stringify(message))
+            }
+            else {
+                let message = {'type':'timeIsUp'}
+                room.socketForDoor.broadcastMessage(JSON.stringify(message))
             }
         }
     }
