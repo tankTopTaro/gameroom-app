@@ -228,6 +228,7 @@ function startListenningToSocket(){
             }
             if(json.type === 'newLevelCountdown'){
                 console.log(json.audio)
+                fetchAudio(json.audio)
             }
             if(json.type === 'colorNames'){
                 let color = json
