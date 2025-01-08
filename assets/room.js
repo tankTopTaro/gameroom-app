@@ -68,7 +68,7 @@ function startListenningToSocket(){
 
                 roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`
 
-                /* let prepTime = newGame.prepTime
+                let prepTime = newGame.prepTime
                 let remainingTime = prepTime
                 if(timerInterval) {
                     clearInterval(timerInterval)
@@ -97,7 +97,7 @@ function startListenningToSocket(){
 
                 updateTimer()
 
-                timerInterval = setInterval(updateTimer, 1000) */
+                timerInterval = setInterval(updateTimer, 1000)
             }
             else if(json.type === 'newLevelCountdown'){
                 console.log(json.audio)
@@ -221,13 +221,10 @@ function startListenningToSocket(){
                 }, 3000)
             }
             else if(json.type === 'gameEnded'){
-                console.log(json.message)
                 playerMessage.textContent = json.message
-                setTimeout(() => {
-                    playerMessage.textContent = ''
-                    roomMessage.textContent = ''
-                    lifesContainer.innerHTML = ''
-                }, 2000)
+                roomElement.textContent = ''
+                lifesContainer.innerHTML = ''
+                countdownElement.textContent = '00:00'
             }
         }
 
