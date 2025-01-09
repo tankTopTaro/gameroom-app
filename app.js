@@ -16,8 +16,8 @@ const { handleUncaughtException, hsvToRgb, areRectanglesIntersecting } = require
 
 require('dotenv').config();
 
-//const roomType = process.env.GAME_ROOM_BASKETBALLHOOPS;
-const roomType = process.env.GAME_ROOM_DOUBLEGRID;
+const roomType = process.env.GAME_ROOM_BASKETBALLHOOPS;
+//const roomType = process.env.GAME_ROOM_DOUBLEGRID;
 const dummyPlayers = {};    // TODO: Replace with actual database
 
 process.on('uncaughtException', handleUncaughtException)
@@ -336,6 +336,8 @@ class GameSession{
         this.doorCountdown = this.timeForWaiting
         this.doorTimeStartedAt = Date.now()
         this.doorTimer = undefined
+        this.scoreTimer = undefined
+        this.playerScore = 0
     }
 
     // Initializes a variable called result,
@@ -365,6 +367,8 @@ class GameSession{
     // Resets the game states
     reset(){
         this.status = undefined
+        this.scoreTimer = undefined
+        this.playerScore = 0
         this.shapes = []
         this.lastLevelCreatedAt = Date.now()
         room.lights.forEach(light => {
@@ -398,10 +402,6 @@ class GameSession{
     async prepare(){  // prepares anything that is better to prepare and wait for the players input on a certain button (or a countdown to end)
         return new Promise((resolve,reject) => {
             console.log('preparation starts...');
-            if(this.doorTimer){
-                clearInterval(this.doorTimer)
-            }
-    
             this.doorTimer = setInterval(() => {
                 this.updateDoorCountdown()
             }, 0)
@@ -410,14 +410,18 @@ class GameSession{
             this.timeForLevel = 60
             this.countdown = this.timeForLevel
             this.lifes = 5      // At every level, the player starts with 5 lifes 
+            this.scorePool = 250
+            this.remainingScore = this.scorePool
             this.lastLifeLostAt = 0
             let message = {
                 'type':'newLevelStarts',
                 'rule':this.rule,
                 'level':this.level,
                 'lifes':this.lifes,
+                'scorePool':this.scorePool,
                 'countdown':this.countdown,
                 'prepTime':this.prepTime,
+                'roomType':roomType,
                 'audio': '321go',
                 'message': 'Please enter the room',
             }
@@ -778,6 +782,11 @@ class GameSession{
                                 room.lightGroups.wallButtons.forEach((light, i) => {
                                     light.color = shuffledColors[i]
                                 })
+                                let message = {
+                                    'type': 'colorNamesEnd',
+                                }
+                                room.socketForRoom.broadcastMessage(JSON.stringify(message))
+                                room.socketForMonitor.broadcastMessage(JSON.stringify(message))
                             }, 1000)
                         }
                     }, 1000)
@@ -794,14 +803,35 @@ class GameSession{
 
         if (this.animationMetronome) {
             clearInterval(this.animationMetronome);
-        }
+        }    
+        
+        if (roomType === 'doubleGrid'){
+            console.log('Double Grid')
+            this.animationMetronome = setInterval(() =>{
+                this.updatePlayerScore()
+                this.updateCountdown()
+                this.updateShapes()
+                this.applyShapesOnLights()
+                room.sendLightsInstructionsIfIdle()
+            } , 1000/25)
+        } else if (roomType === 'basketballHoops'){
+            console.log('Basketball Hoops')
+            this.animationMetronome = setInterval(() =>{
+                this.updateShapes()
+                this.applyShapesOnLights()
+                room.sendLightsInstructionsIfIdle()
+            } , 1000/25)
+            const receivedMessage = room.socketForRoom.waitForMessage();
 
-        this.animationMetronome = setInterval(() =>{
-            this.updateCountdown()
-            this.updateShapes()
-            this.applyShapesOnLights()
-            room.sendLightsInstructionsIfIdle()
-        } , 1000/25)
+            receivedMessage.then((message) => {
+                if (message.type === 'colorNamesEnd') {
+                    this.animationMetronome = setInterval(() =>{
+                        this.updateCountdown()
+                        this.updatePlayerScore()
+                    } , 1000/25)
+                }
+            })
+        }
 
         this.gameStartedAt = Date.now()
         this.status = 'running'
@@ -946,9 +976,11 @@ class GameSession{
                             // clickedLight.color = black
                             // clickedLight.onClick = 'ignore'
                             //TODO : room.playSound('success1')
+
                             let message = {
                                 type: 'playerScored',
-                                audio: 'playerScored'
+                                audio: 'playerScored',
+                                color: clickedLight.color
                             }
         
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -956,10 +988,30 @@ class GameSession{
         
                             this.lightColorSequence.splice(0, 1)
                             if(this.lightColorSequence.length === 0){
-                                // TODO: adjust levelCompleted to loop same level when roomType is 'basketballHoops'
-                                this.levelCompleted()
+                                clearInterval(this.animationMetronome)
+                                // this.levelCompleted()
+                                this.playerScore += Math.floor(this.remainingScore)
+
+                                let message = { 
+                                    'type': 'levelCompleted',
+                                    'message': 'Player Wins',
+                                    'audio': 'levelCompleted',
+                                    'scoreEarned': Math.floor(this.playerScore),
+                                    'totalScore':this.playerScore
+                                }
+                        
+                                room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+                                room.socketForRoom.broadcastMessage(JSON.stringify(message))
+
+                                this.offerSameLevel() // Loop the game for now  
                             }
                         } else {
+                            let message = {
+                                type: 'playerFailed',
+                                audio: 'playerFailed',
+                                color: clickedLight.color
+                            }
+                            room.socketForRoom.broadcastMessage(JSON.stringify(message))
                             this.removeLife()   // Deducts player life if wrong button number order is pushed
                         }
                     }
@@ -972,14 +1024,23 @@ class GameSession{
     levelCompleted(){
         clearInterval(this.animationMetronome)          // Stop the animation
 
+        this.playerScore += Math.floor(this.remainingScore)
+
+        if (this.scoreTimer) {
+            clearInterval(this.scoreTimer);
+            this.scoreTimer = undefined;
+        }
+
         let message = { 
             'type': 'levelCompleted',
             'message': 'Player Wins',
-            'audio': 'levelCompleted'
+            'audio': 'levelCompleted',
+            'scoreEarned': Math.floor(this.playerScore),
+            'totalScore':this.playerScore
         }
 
         room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-        room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+        room.socketForRoom.broadcastMessage(JSON.stringify(message))
 
         if(room.waitingGameSession === undefined){       
             this.offerNextLevel()
@@ -1060,7 +1121,7 @@ class GameSession{
     }
 
     async startNextLevel(){
-        const receivedMessage = await room.socketForRoom.waitForMessage();
+        const receivedMessage = await room.socketForRoom.waitForMessage('');
         console.log('Received:', receivedMessage)
 
         if(room.waitingGameSession !== undefined){
@@ -1085,19 +1146,24 @@ class GameSession{
     async endAndExit(){
         // TODO : await playing sound to say Byebye
         console.log('Ending game...')
+        if (this.scoreTimer) {
+            clearInterval(this.scoreTimer);
+            this.scoreTimer = undefined;
+        }
+
         let messageForRoom = {
-                'type': 'gameEnded',
-                'message': 'Please leave the room',
-                // 'audio': 'ByeBye'
-            }
-            let messageForDoor = {
-                'type': 'gameEnded',
-                'message': 'Please enter the room',
-                // 'audio': 'PleaseEnter'
-            }
-            room.socketForRoom.broadcastMessage(JSON.stringify(messageForRoom))
-            room.socketForMonitor.broadcastMessage(JSON.stringify(messageForRoom))
-            room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
+            'type': 'gameEnded',
+            'message': 'Please leave the room',
+            // 'audio': 'ByeBye'
+        }
+        let messageForDoor = {
+            'type': 'gameEnded',
+            'message': 'Please enter the room',
+            // 'audio': 'PleaseEnter'
+        }
+        room.socketForRoom.broadcastMessage(JSON.stringify(messageForRoom))
+        room.socketForMonitor.broadcastMessage(JSON.stringify(messageForRoom))
+        room.socketForDoor.broadcastMessage(JSON.stringify(messageForDoor))
         this.reset()
         room.isFree = true  // Ensures that the room is available for a new game session
         if(room.waitingGameSession !== undefined){
@@ -1121,7 +1187,6 @@ class GameSession{
     }
 
     updateCountdown(){
-
         if (this.status === undefined) {
             return;
         }
@@ -1146,6 +1211,31 @@ class GameSession{
             }
         }
     }
+
+    updatePlayerScore(){
+        if(this.status === undefined || this.scoreTimer){
+            return;
+        }
+    
+        // Decrement per millisecond (divide by 1000 to get per millisecond decrement)
+        const decrementPerMillisecond = (this.scorePool / this.timeForLevel) / 1900;
+        const timePerDecrement = (this.timeForLevel * 1000) / this.scorePool
+    
+        this.scoreTimer = setInterval(() => {
+            // Decrement the score by 1 per millisecond
+            this.remainingScore = Math.max(0, this.remainingScore - decrementPerMillisecond);
+    
+            // console.log('Score: ', Math.floor(this.remainingScore), ' countdown: ', this.countdown);
+            const message = {
+                'type': 'updatePlayerScore',
+                'scorePool': Math.floor(this.remainingScore)
+            };
+    
+            room.socketForRoom.broadcastMessage(JSON.stringify(message));
+            room.socketForMonitor.broadcastMessage(JSON.stringify(message));
+        }, timePerDecrement);
+    }
+    
 
     updateDoorCountdown(){
         let timeLeft = Math.round((this.doorTimeStartedAt + (this.timeForWaiting * 1000) - Date.now()) / 1000)

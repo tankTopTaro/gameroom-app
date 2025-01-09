@@ -2,11 +2,15 @@ let socket = undefined
 let monitoringIsOn = true
 let timerInterval = null
 let isGameOver = false
+let audioQueue = []
 
 const roomElement = document.getElementById('room-info')
 const lifesContainer = document.getElementById('lifes-container')
 const countdownElement = document.getElementById('countdown')
 const playerMessage = document.getElementById('player-alert')
+const colorSequence = document.getElementById('color-sequence')
+const scorePool = document.getElementById('score-pool')
+const playerScore = document.getElementById('player-score')
 
 const heartSVG = `<svg id="heart" xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-heart">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -43,7 +47,9 @@ function startListenningToSocket(){
             if(json.type === 'newLevelStarts'){
                 let newGame = json  
                 console.log('newLevelStarts', newGame)
-                console.log('Current lifesContainer content:', lifesContainer.innerHTML)
+
+                // Reset the color sequence colors
+                resetSpanColors()
                 
                 // Generate hearts based on 'newGame.lifes'
                 if(isGameOver) {
@@ -64,6 +70,13 @@ function startListenningToSocket(){
                         heart.innerHTML = heartSVG;  // Insert the SVG directly
                         lifesContainer.appendChild(heart);
                     }
+                }
+
+                if(newGame.roomType === 'basketballHoops'){
+                    colorSequence.classList.remove('invisible')
+                    colorSequence.classList.add('visible')
+                } else {
+
                 }
 
                 roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`
@@ -102,6 +115,34 @@ function startListenningToSocket(){
             else if(json.type === 'newLevelCountdown'){
                 console.log(json.audio)
                 fetchAudio(json.audio)
+            }
+            else if(json.type === 'playerScored'){
+                fetchAudio(json.audio)
+                console.log('Color clicked:', json.color)
+                setColorToSpan(json.color)
+            }
+            else if(json.type === 'playerFailed'){
+                console.log('Color clicked:', json.color)
+                setColorToSpan(json.color)
+            }
+            if(json.type === 'colorNames'){
+                let color = json
+                
+                if (color) {
+                    audioQueue.push(fetchAudio(color.name));
+                }
+            }
+            if(json.type === 'colorNamesEnd'){
+                Promise.all(audioQueue)
+                    .then(() => {
+                        let message = {
+                            'type': 'colorNamesEnd'
+                        }
+                        socket.send(JSON.stringify(message))
+                    })
+                    .catch(error => {
+                        console.error('Error playing audio:', error);
+                    })
             }
             else if(json.type === 'updateLifes'){
                 let lifes = json.lifes
@@ -150,6 +191,12 @@ function startListenningToSocket(){
                     countdownElement.textContent = `${minutes}:${seconds}`
                 }
             }
+            else if(json.type === 'updatePlayerScore'){
+                scorePool.textContent = json.scorePool
+            }
+            else if(json.type === 'levelCompleted'){
+                playerScore.textContent = json.totalScore
+            }
             else if(json.type === 'offerSameLevel' || 
                 json.type === 'offerNextLevel'){
                 console.log(json.message)
@@ -159,72 +206,80 @@ function startListenningToSocket(){
                 const roomMessage = document.getElementById('room-message')
                 roomMessage.textContent = json.message
 
-                // Hide the HUD
-                if (hud) {
-                    hud.classList.remove('d-flex')
-                    hud.classList.add('d-none')
-                }
+                setTimeout(() => {
+                    // Hide the HUD
+                    if (hud) {
+                        hud.classList.remove('d-flex')
+                        hud.classList.add('d-none')
+                    }
 
-                if (roomMessageContainer) {
-                    roomMessageContainer.classList.remove('d-none');
-                    roomMessageContainer.classList.add('d-flex');
-                }
+                    if (roomMessageContainer) {
+                        roomMessageContainer.classList.remove('d-none');
+                        roomMessageContainer.classList.add('d-flex');
+                    }
 
-                const continueBtn = document.getElementById('continue-button')
-                if (continueBtn) {
-                    continueBtn.addEventListener('click', () => {
-                        const message = {
-                            'type': 'continue'
-                        };
-            
-                        // Send the message via the socket
-                        socket.send(JSON.stringify(message));
-            
-                        // Hide the room message and show the HUD again
-                        if (roomMessageContainer) {
-                            roomMessageContainer.classList.remove('d-flex');
-                            roomMessageContainer.classList.add('d-none');
-                        }
-            
-                        if (hud) {
-                            hud.classList.remove('d-none');
-                            hud.classList.add('d-flex');
-                        }
-                    });
-                }
+                    const continueBtn = document.getElementById('continue-button')
+                    if (continueBtn) {
+                        continueBtn.addEventListener('click', () => {
+                            const message = {
+                                'type': 'continue'
+                            };
+                
+                            // Send the message via the socket
+                            socket.send(JSON.stringify(message));
+                
+                            // Hide the room message and show the HUD again
+                            if (roomMessageContainer) {
+                                roomMessageContainer.classList.remove('d-flex');
+                                roomMessageContainer.classList.add('d-none');
+                            }
+                
+                            if (hud) {
+                                hud.classList.remove('d-none');
+                                hud.classList.add('d-flex');
+                            }
+                        });
+                    }
 
-                const noBtn = document.getElementById('no-button')
-                if (noBtn) {
-                    noBtn.addEventListener('click', () => {
-                        const message = {
-                            'type': 'exit'
-                        };
-            
-                        // Send the message via the socket
-                        socket.send(JSON.stringify(message));
-            
-                        // Hide the room message and show the HUD again
-                        if (roomMessageContainer) {
-                            roomMessageContainer.classList.remove('d-flex');
-                            roomMessageContainer.classList.add('d-none');
-                        }
-            
-                        if (hud) {
-                            hud.classList.remove('d-none');
-                            hud.classList.add('d-flex');
-                        }
-                    });
-                }
+                    const noBtn = document.getElementById('no-button')
+                    if (noBtn) {
+                        noBtn.addEventListener('click', () => {
+                            const message = {
+                                'type': 'exit'
+                            };
+                
+                            // Send the message via the socket
+                            socket.send(JSON.stringify(message));
+                
+                            // Hide the room message and show the HUD again
+                            if (roomMessageContainer) {
+                                roomMessageContainer.classList.remove('d-flex');
+                                roomMessageContainer.classList.add('d-none');
+                            }
+                
+                            if (hud) {
+                                hud.classList.remove('d-none');
+                                hud.classList.add('d-flex');
+                            }
+                        });
+                    }
+                }, 2000)
 
                 setTimeout(() => {
                     noBtn.click()
-                }, 3000)
+                }, 5000)
             }
             else if(json.type === 'gameEnded'){
                 playerMessage.textContent = json.message
                 roomElement.textContent = ''
                 lifesContainer.innerHTML = ''
                 countdownElement.textContent = '00:00'
+                scorePool.textContent = '250'
+                playerScore.textContent = '0'
+                setTimeout(() => {
+                    playerMessage.textContent = ''
+                }, 2000)
+                resetSpanColors()
             }
         }
 
@@ -262,17 +317,56 @@ async function fetchAudio(soundName) {
         const data = await response.json()
         
         // console.log(data)
-        const audio = new Audio(data[soundName])
+        /* const audio = new Audio(data[soundName])
         audio.muted = true;
         audio.play().then(() => {
             audio.muted = false;
         }).catch(err => {
             console.error('Autoplay failed:', err)
-        });
+        }); */
+        return new Promise((resolve, reject) => {
+            const audio = new Audio(data[soundName])
+            audio.muted = true;
+            audio.play()
+                .then(() => {
+                    audio.muted = false;
+                })
+                .catch(err => {
+                    console.error('Autoplay failed:', err)
+                    reject(err);
+                });
+            
+                audio.onended = () => {
+                    resolve();
+                };
+        })
 
     }catch(error){
         console.error('Failed to load audio:', error)
     }
+}
+
+let currentSpanIndex = 0;
+function setColorToSpan(color) {
+    const spans = colorSequence.querySelectorAll('span');
+
+    if(spans.length > 0 && color){
+        const [r, g, b] = color;
+
+        console.log('r', r, 'g', g, 'b', b)
+
+        spans[currentSpanIndex].style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+
+        currentSpanIndex = (currentSpanIndex + 1) % spans.length;
+    }
+}
+
+function resetSpanColors() {
+    const spans = colorSequence.querySelectorAll('span');
+    spans.forEach(span => {
+        span.style.backgroundColor = '';  // Clear the background color
+    });
+    currentSpanIndex = 0; // Reset the index if you want to start from the first span
 }
 
 startListenningToSocket()

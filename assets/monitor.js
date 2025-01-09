@@ -9,6 +9,7 @@ let monitoringIsOn = true
 let lightsAreDrawn = false
 let bufferedLightUpdates = []
 let yellowDots = []
+let audioQueue = []
 
 const lifesElement = document.getElementById('lifes')
 const statusElement = document.getElementById('status')
@@ -234,8 +235,20 @@ function startListenningToSocket(){
                 let color = json
                 
                 if (color) {
-                    fetchAudio(color.name)
+                    audioQueue.push(fetchAudio(color.name));
                 }
+            }
+            if(json.type === 'colorNamesEnd'){
+                Promise.all(audioQueue)
+                    .then(() => {
+                        let message = {
+                            'type': 'colorNamesEnd'
+                        }
+                        socket.send(JSON.stringify(message))
+                    })
+                    .catch(error => {
+                        console.error('Error playing audio:', error);
+                    })
             }
             if(json.type === 'playerScored'){
                 let success = json
@@ -346,13 +359,29 @@ async function fetchAudio(soundName) {
         const data = await response.json()
         
         // console.log(data)
-        const audio = new Audio(data[soundName])
+        /* const audio = new Audio(data[soundName])
         audio.muted = true;
         audio.play().then(() => {
             audio.muted = false;
         }).catch(err => {
             console.error('Autoplay failed:', err)
-        });
+        }); */
+        return new Promise((resolve, reject) => {
+            const audio = new Audio(data[soundName])
+            audio.muted = true;
+            audio.play()
+                .then(() => {
+                    audio.muted = false;
+                })
+                .catch(err => {
+                    console.error('Autoplay failed:', err)
+                    reject(err);
+                });
+            
+                audio.onended = () => {
+                    resolve();
+                };
+        })
 
     }catch(error){
         console.error('Failed to load audio:', error)
