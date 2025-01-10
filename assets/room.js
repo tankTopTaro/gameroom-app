@@ -4,6 +4,8 @@ let timerInterval = null
 let isGameOver = false
 let audioQueue = []
 
+let playerData = {}
+
 const roomElement = document.getElementById('room-info')
 const lifesContainer = document.getElementById('lifes-container')
 const countdownElement = document.getElementById('countdown')
@@ -76,10 +78,13 @@ function startListenningToSocket(){
                     colorSequence.classList.remove('invisible')
                     colorSequence.classList.add('visible')
                 } else {
-
+                    colorSequence.classList.remove('visible')
+                    colorSequence.classList.add('invisible')
                 }
 
                 roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`
+                scorePool.textContent = newGame.scorePool
+                playerScore.textContent = ''
 
                 let prepTime = newGame.prepTime
                 let remainingTime = prepTime
@@ -115,6 +120,10 @@ function startListenningToSocket(){
             else if(json.type === 'newLevelCountdown'){
                 console.log(json.audio)
                 fetchAudio(json.audio)
+            }
+            else if(json.type === 'playerAndRoomData'){
+                let playerDat = {...json}
+                console.log('Player and room data:', playerDat)
             }
             else if(json.type === 'playerScored'){
                 fetchAudio(json.audio)

@@ -16,9 +16,9 @@ const { handleUncaughtException, hsvToRgb, areRectanglesIntersecting } = require
 
 require('dotenv').config();
 
-const roomType = process.env.GAME_ROOM_BASKETBALLHOOPS;
-//const roomType = process.env.GAME_ROOM_DOUBLEGRID;
-const dummyPlayers = {};    // TODO: Replace with actual database
+//const roomType = process.env.GAME_ROOM_BASKETBALLHOOPS;
+const roomType = process.env.GAME_ROOM_DOUBLEGRID;
+const dummyPlayers = [];    // TODO: Replace with actual database
 
 process.on('uncaughtException', handleUncaughtException)
 
@@ -139,22 +139,19 @@ class Room{
             const { id } = req.params;
             const { playerName, playerAvatar } = req.body
 
-            dummyPlayers[id] = { id, playerName, playerAvatar }
+            const playerData = { id, playerName, playerAvatar }
 
-            const playerData = dummyPlayers[id];
+            dummyPlayers.push(playerData)
 
-            if (playerData) {
-                console.log(`RFID scanned: ${id}, broadcasting to door clients`);
-                let message = {
-                    type: 'playerAndRoomData', 
-                    playerData: playerData,
-                    roomData: this.type,
-                }
-                room.socketForDoor.broadcastMessage(JSON.stringify(message));
-                res.json({ message: 'Player data broadcasted', data: playerData });
-            }else {
-                res.status(404).json({ error: 'Player not found' });
+            console.log(`RFID scanned: ${id}, broadcasting to door clients`);
+            let message = {
+                'type': 'playerAndRoomData', 
+                'playerData': dummyPlayers,
+                'roomData': this.type
             }
+            room.socketForDoor.broadcastMessage(JSON.stringify(message));
+            room.socketForRoom.broadcastMessage(JSON.stringify(message));
+            res.json({ message: 'Player data broadcasted', data: playerData });
             
         })
 
@@ -1024,13 +1021,13 @@ class GameSession{
     levelCompleted(){
         clearInterval(this.animationMetronome)          // Stop the animation
 
-        this.playerScore += Math.floor(this.remainingScore)
-
         if (this.scoreTimer) {
             clearInterval(this.scoreTimer);
             this.scoreTimer = undefined;
         }
 
+        this.playerScore += Math.floor(this.remainingScore)
+        
         let message = { 
             'type': 'levelCompleted',
             'message': 'Player Wins',
@@ -1213,7 +1210,7 @@ class GameSession{
     }
 
     updatePlayerScore(){
-        if(this.status === undefined || this.scoreTimer){
+        if(this.status === undefined){
             return;
         }
     
@@ -1222,6 +1219,12 @@ class GameSession{
         const timePerDecrement = (this.timeForLevel * 1000) / this.scorePool
     
         this.scoreTimer = setInterval(() => {
+            // If the game ends or level completes, stop the timer
+            if (this.status === undefined || this.remainingScore <= 0 || this.countdown <= 0) {
+                clearInterval(this.scoreTimer);
+                this.scoreTimer = undefined;
+                return;
+            }
             // Decrement the score by 1 per millisecond
             this.remainingScore = Math.max(0, this.remainingScore - decrementPerMillisecond);
     
@@ -1233,6 +1236,10 @@ class GameSession{
     
             room.socketForRoom.broadcastMessage(JSON.stringify(message));
             room.socketForMonitor.broadcastMessage(JSON.stringify(message));
+        
+            /* if(this.remainingScore <= 0){
+                clearInterval
+            } */
         }, timePerDecrement);
     }
     

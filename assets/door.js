@@ -45,6 +45,7 @@ function startListenningToSocket(socket){
         if(json){
             if(json.type === 'playerAndRoomData'){
                 const data = json
+                console.log(data)
                 renderDoorData(data)
             }
             if(json.type === 'newLevelStarts'){
@@ -120,14 +121,23 @@ function startListenningToSocket(socket){
 
 function renderDoorData(data){
     const roomType = data.roomData
-    const player = data.playerData
+    const playerData = data.playerData
 
     if(players.waiting.length >= 6) {
         console.log('Player limit reached.')
         return;
     }
-    
-    players.waiting.push(player)
+
+    if(Array.isArray(playerData)){
+        playerData.forEach(player => {
+            const isAlreadyWaiting = players.waiting.some(p => p.id === player.id);
+            
+            if(!isAlreadyWaiting && players.waiting.length < 6){
+                players.waiting.push(player)
+            }
+        })
+    }
+
     renderPlayerData(players.waiting, 'player-waiting');
     renderRoomConfig(roomType)
 }
