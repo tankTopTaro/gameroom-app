@@ -54,13 +54,6 @@ function startListenningToSocket(socket){
                 console.log('playerAndRoomData', data)
                 renderDoorData(data)
             }
-            if(json.type === 'playingList'){
-                players.room = json.playing
-                players.waiting = []
-                console.log('playingList', players)
-                renderPlayerData(players.room, 'player-room')
-                renderPlayerData(players.waiting, 'player-waiting')
-            }
             if(json.type === 'newLevelStarts'){
                 const data = json
                 if(timerInterval){
@@ -68,19 +61,25 @@ function startListenningToSocket(socket){
                     timerInterval=null
                 }
                 console.log('newGame', data)
-                /* // Move waiting players to current players
+                
+                // Move waiting players to current players
                 players.room.push(...players.waiting); // Move all waiting players to the room
                 players.waiting = []; // Clear the waiting list
-                renderPlayerData(players.room, 'player-room'); // Re-render current players 
-                renderPlayerData(players.waiting, 'player-waiting'); // Re-render waiting players (empty)*/
+                renderPlayerData(players.room, 'player-room'); // Re-render current players
+                renderPlayerData(players.waiting, 'player-waiting'); // Re-render waiting players (empty)
+
                 roomMessage.textContent = json.message
             }
             if(json.type === 'gameSessionInitialized'){
                 console.log('gameSessionInitialized', json.message)
                 roomMessage.textContent = json.message
+                /* players.room = json.playerData
+                players.waiting = []
+                console.log('playingList', players)
+                renderPlayerData(players.room, 'player-room')
+                renderPlayerData(players.waiting, 'player-waiting') */
             }
             if(json.type === 'updateDoorCountdown'){
-                console.log('updateDoorCountdown', json.countdown)
                 let countdown = json.countdown
                 let minutes = Math.floor(countdown / 60)
                 let seconds = countdown % 60
@@ -143,9 +142,11 @@ function renderDoorData(data){
 
     if(Array.isArray(playerData)){
         playerData.forEach(player => {
-            const isAlreadyWaiting = players.waiting.some(p => p.id === player.id);
+            const isAlreadyPlaying = players.room.some(p => p.id === player.id);
+
+            console.log('Player id', player.id, 'isAlreadyWaiting', isAlreadyPlaying)
             
-            if(!isAlreadyWaiting && players.waiting.length < 6){
+            if(!isAlreadyPlaying && players.waiting.length < 6){
                 players.waiting.push(player)
             }
         })
@@ -315,7 +316,7 @@ startGameBtn.addEventListener('click', () => {
         // confirmModal.show();
 
         // Move players from the lobby to the room
-        if (players.waiting.length > 0) {
+        if (players.room.length === 0) {
             players.room = [...players.room, ...players.waiting]; // Add all waiting players to the room
             players.waiting = []; // Clear the waiting list
         }

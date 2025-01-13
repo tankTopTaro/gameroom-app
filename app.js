@@ -18,10 +18,7 @@ require('dotenv').config();
 
 //const roomType = process.env.GAME_ROOM_BASKETBALL;
 const roomType = process.env.GAME_ROOM_DOUBLEGRID;
-const dummyPlayers = {  // TODO: Replace with actual database
-    playing: [],
-    waiting: []
-}    
+const dummyPlayers = [] // TODO: Replace with actual database
 
 process.on('uncaughtException', handleUncaughtException)
 
@@ -48,6 +45,9 @@ class Room{
         this.sendLightsInstructionsRequestIsPending = false
         this.lightCounter = 0
         this.lightGroups = {}
+
+        this.currentPlayer = undefined
+        
         this.init()
     }
 
@@ -144,12 +144,12 @@ class Room{
 
             const playerData = { id, playerName, playerAvatar, score: 0 }
 
-            dummyPlayers.waiting.push(playerData)
+            dummyPlayers.push(playerData)
 
             console.log(`RFID scanned: ${id}, broadcasting to door clients`);
             let message = {
                 'type': 'playerAndRoomData', 
-                'playerData': dummyPlayers.waiting,
+                'playerData': dummyPlayers,
                 'roomData': this.type
             }
             room.socketForDoor.broadcastMessage(JSON.stringify(message));
@@ -170,34 +170,43 @@ class Room{
 
         this.server.get('/game/request', async (req, res) => {
             // console.log(req.query);
-            // Move waiting players to the room
+            /* // Move waiting players to the room
             if(dummyPlayers.waiting && dummyPlayers.waiting.length > 0){
                 if(dummyPlayers.playing.length === 0){
-                    dummyPlayers.playing = [...dummyPlayers.playing, ...dummyPlayers.waiting]
+                    dummyPlayers.playing = [...dummyPlayers.waiting]
                     dummyPlayers.waiting = []   // Clear the waiting list
                 }
             }
+            
             // Broadcast the updated player data
             let message = {
                 'type': 'playingList',
                 'playing': dummyPlayers.playing,
             }
-            room.socketForDoor.broadcastMessage(JSON.stringify(message));
+            room.socketForDoor.broadcastMessage(JSON.stringify(message)); */
 
             if(this.isFree){
+
                 this.currentGameSession = new GameSession(req.query.rule, req.query.level)
                 let gameSessionInitialized = await this.currentGameSession.init()
                 
+               /*  if(dummyPlayers.playing.length === 0){
+                    console.log('Moving players to room...')
+                    dummyPlayers.playing = [...dummyPlayers.waiting]
+                    dummyPlayers.waiting = []   // Clear the waiting list
+                    console.log('Waiting: ', dummyPlayers.waiting, ' Playing: ', dummyPlayers.playing)
+                }*/
                 
                 let message = { 
                     'type': 'gameSessionInitialized', 
                     'message': 'Please wait',
-                    'playerData': dummyPlayers.playing,
+                    'playerData': dummyPlayers,
                 }
                 room.socketForDoor.broadcastMessage(JSON.stringify(message));
                 
                 if(gameSessionInitialized === true){
                     //res.send('<html><body><h1>Please enter the room</h1></body></html>');
+                    
                     res.json({ "gameSessionInitialized": gameSessionInitialized });
                 }
                 else{
@@ -208,6 +217,7 @@ class Room{
             }
             else{
                 this.waitingGameSession = new GameSession(req.query.rule, req.query.level)
+                
                 //res.send('<html><body><h1>Please wait</h1></body></html>');
                 res.json({ "waitingGameSession": this.waitingGameSession });
             }
@@ -433,7 +443,7 @@ class GameSession{
                 'countdown':this.countdown,
                 'prepTime':this.prepTime,
                 'roomType':roomType,
-                'players': dummyPlayers.playing,
+                'players': dummyPlayers,
                 'audio': '321go',
                 'message': 'Please enter the room',
             }
@@ -883,7 +893,7 @@ class GameSession{
                                 type: 'playerScored',
                                 audio: 'playerScored',
                                 scoreMultiplier: this.scoreMultiplier,
-                                playerScore: dummyPlayers.playing[0].score
+                                playerScore: dummyPlayers[0].score
                             }
 
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -937,7 +947,7 @@ class GameSession{
                                 type: 'playerScored',
                                 audio: 'playerScored',
                                 scoreMultiplier: this.scoreMultiplier,
-                                playerScore: dummyPlayers.playing[0].score
+                                playerScore: dummyPlayers[0].score
                             }
 
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -991,7 +1001,7 @@ class GameSession{
                                 type: 'playerScored',
                                 audio: 'playerScored',
                                 scoreMultiplier: this.scoreMultiplier,
-                                playerScore: dummyPlayers.playing[0].score
+                                playerScore: dummyPlayers[0].score
                             }
 
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -1042,7 +1052,7 @@ class GameSession{
                                 audio: 'playerScored',
                                 color: clickedLight.color,
                                 scoreMultiplier: this.scoreMultiplier,
-                                playerScore: dummyPlayers.playing[0].score
+                                playerScore: dummyPlayers[0].score
                             } 
         
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -1315,7 +1325,7 @@ class GameSession{
     correctButton(){
         this.score += this.baseScore * this.scoreMultiplier
         this.scoreMultiplier++
-        dummyPlayers.playing.forEach((player) => {
+        dummyPlayers.forEach((player) => {
             player.score = this.score
         })
     }
