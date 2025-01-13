@@ -7,18 +7,24 @@ const players = {
 const startGameBtn = document.getElementById('startGameBtn');
 const confirmBtn = document.getElementById('confirmBtn');
 
+// const roomBtns = document.querySelectorAll('.roomBtn');
+
 const levelOneBtns = document.querySelectorAll('.level-one');
 const levelTwoBtns = document.querySelectorAll('.level-two');
 const levelThreeBtns = document.querySelectorAll('.level-three');
 
 const roomMessage = document.getElementById('roomMessage');
-const basketballHoopsRoom = document.getElementById('basketballHoopsRoom')
+const basketballRoom = document.getElementById('basketballRoom')
 const doubleGridRoom = document.getElementById('doubleGridRoom')
 const countdownElement = document.getElementById('countdown')
 const roomConfig = document.getElementById('roomConfig')
 
+// let selectedRoom = null;
+// let selectedRoomBtn = null;
+
 let selectedLevelBtn = null;
 let selectedLevelValue = null;
+
 let timerInterval = null;
 let waitingTime = 300;
 
@@ -45,8 +51,15 @@ function startListenningToSocket(socket){
         if(json){
             if(json.type === 'playerAndRoomData'){
                 const data = json
-                console.log(data)
+                console.log('playerAndRoomData', data)
                 renderDoorData(data)
+            }
+            if(json.type === 'playingList'){
+                players.room = json.playing
+                players.waiting = []
+                console.log('playingList', players)
+                renderPlayerData(players.room, 'player-room')
+                renderPlayerData(players.waiting, 'player-waiting')
             }
             if(json.type === 'newLevelStarts'){
                 const data = json
@@ -55,15 +68,15 @@ function startListenningToSocket(socket){
                     timerInterval=null
                 }
                 console.log('newGame', data)
-                // Move waiting players to current players
+                /* // Move waiting players to current players
                 players.room.push(...players.waiting); // Move all waiting players to the room
                 players.waiting = []; // Clear the waiting list
-                renderPlayerData(players.room, 'player-room'); // Re-render current players
-                renderPlayerData(players.waiting, 'player-waiting'); // Re-render waiting players (empty)
+                renderPlayerData(players.room, 'player-room'); // Re-render current players 
+                renderPlayerData(players.waiting, 'player-waiting'); // Re-render waiting players (empty)*/
                 roomMessage.textContent = json.message
-                //startWaitingTimer() // remove the countdown here
             }
             if(json.type === 'gameSessionInitialized'){
+                console.log('gameSessionInitialized', json.message)
                 roomMessage.textContent = json.message
             }
             if(json.type === 'updateDoorCountdown'){
@@ -93,8 +106,8 @@ function startListenningToSocket(socket){
                 roomConfig.classList.remove('roomConfigVisible');
                 roomConfig.classList.add('roomConfigHidden');
 
-                basketballHoopsRoom.classList.remove('showConfig');
-                basketballHoopsRoom.classList.add('hideConfig');
+                basketballRoom.classList.remove('showConfig');
+                basketballRoom.classList.add('hideConfig');
 
                 doubleGridRoom.classList.remove('showConfig');
                 doubleGridRoom.classList.add('hideConfig');
@@ -120,8 +133,8 @@ function startListenningToSocket(socket){
 }
 
 function renderDoorData(data){
-    const roomType = data.roomData
     const playerData = data.playerData
+    const roomType = data.roomData
 
     if(players.waiting.length >= 6) {
         console.log('Player limit reached.')
@@ -139,7 +152,7 @@ function renderDoorData(data){
     }
 
     renderPlayerData(players.waiting, 'player-waiting');
-    renderRoomConfig(roomType)
+    renderRoomConfig(roomType);
 }
 
 function renderPlayerData(playerList, containerId) {
@@ -175,8 +188,8 @@ function renderRoomConfig(roomType){
     roomConfig.classList.add('roomConfigVisible');
 
     // Hide both rooms initially
-    basketballHoopsRoom.classList.remove('showConfig');
-    basketballHoopsRoom.classList.add('hideConfig');
+    basketballRoom.classList.remove('showConfig');
+    basketballRoom.classList.add('hideConfig');
     doubleGridRoom.classList.remove('showConfig');
     doubleGridRoom.classList.add('hideConfig');
 
@@ -194,10 +207,10 @@ function renderRoomConfig(roomType){
         // only show the doubleGridRoom
         doubleGridRoom.classList.remove('hideConfig');
         doubleGridRoom.classList.add('showConfig');
-    } else if (roomType === 'basketballHoops'){
-        // only show the basketballHoopsRoom
-        basketballHoopsRoom.classList.remove('hideConfig');
-        basketballHoopsRoom.classList.add('showConfig');      
+    } else if (roomType === 'basketball'){
+        // only show the basketballRoom
+        basketballRoom.classList.remove('hideConfig');
+        basketballRoom.classList.add('showConfig');      
     }
 }
 
@@ -221,6 +234,36 @@ async function submitRoomConfig(rule, level){
         console.error('Error submitting room config:', error);
     }
 }
+
+/* function handleRoomSelection(event) {
+    const clickedButton = event.target;
+
+    if (selectedRoomBtn) {
+        selectedRoomBtn.classList.remove('btn-danger');
+        selectedRoomBtn.classList.add('btn-primary');
+    }
+
+    if (selectedRoomBtn === clickedButton) {
+        selectedRoomBtn.classList.remove('btn-danger');
+        selectedRoomBtn.classList.add('btn-primary');
+        selectedRoomBtn = null;
+        selectedRoom = null;
+        return;
+    }
+
+    selectedRoomBtn = clickedButton;
+    selectedRoom = clickedButton.getAttribute('data-room');
+    selectedRoomBtn.classList.remove('btn-primary');
+    selectedRoomBtn.classList.add('btn-danger');
+
+    if(selectedRoom){
+        renderRoomConfig(selectedRoom);
+    }
+}
+
+roomBtns.forEach(button => {
+    button.addEventListener('click', handleRoomSelection);
+}) */
 
 function handleLevelSelection(event) {
     const clickedButton = event.target;
@@ -271,26 +314,27 @@ startGameBtn.addEventListener('click', () => {
         // const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
         // confirmModal.show();
 
-         // Move players from the lobby to the room
-         if (players.room.length === 0) {
+        // Move players from the lobby to the room
+        if (players.waiting.length > 0) {
             players.room = [...players.room, ...players.waiting]; // Add all waiting players to the room
             players.waiting = []; // Clear the waiting list
-         }
+        }
+
+         // Re-render both lists 
+        renderPlayerData(players.waiting, 'player-waiting');
+        renderPlayerData(players.room, 'player-room');
 
         // Hide room config and buttons
         roomConfig.classList.remove('roomConfigVisible');
         roomConfig.classList.add('roomConfigHidden');
-        basketballHoopsRoom.classList.remove('showConfig');
-        basketballHoopsRoom.classList.add('hideConfig');
+        basketballRoom.classList.remove('showConfig');
+        basketballRoom.classList.add('hideConfig');
         doubleGridRoom.classList.remove('showConfig');
         doubleGridRoom.classList.add('hideConfig');
         startGameBtn.textContent = '';
         startGameBtn.classList.add('disabled')
- 
-        // Re-render both lists 
-        renderPlayerData(players.waiting, 'player-waiting');
-        renderPlayerData(players.room, 'player-room');
 
+        // Include the SelectedRoom in the request
         submitRoomConfig(selectedRuleValue, selectedLevelValue);
     } else {
         console.log('No level selected')
@@ -304,32 +348,5 @@ startGameBtn.addEventListener('click', () => {
         }, 1000)
     }
 })
-
-function startWaitingTimer() {
-    let remainingTime = waitingTime
-                
-    if(remainingTime !== null){
-        const updateTimer = () => {
-
-            let minutes = Math.floor(remainingTime / 60)
-            let seconds = remainingTime % 60
-    
-            minutes = minutes < 10 ? '0' + minutes : minutes
-            seconds = seconds < 10 ? '0' + seconds : seconds
-    
-            countdownElement.textContent = `${minutes}:${seconds}`
-    
-            remainingTime--
-    
-            if(remainingTime < 0) {
-                clearInterval(timerInterval)
-            }
-        }
-    
-        updateTimer()
-    
-        timerInterval = setInterval(updateTimer, 1000)
-    }
-}
 
 startListenningToSocket(socket)

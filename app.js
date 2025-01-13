@@ -16,9 +16,12 @@ const { handleUncaughtException, hsvToRgb, areRectanglesIntersecting } = require
 
 require('dotenv').config();
 
-//const roomType = process.env.GAME_ROOM_BASKETBALLHOOPS;
+//const roomType = process.env.GAME_ROOM_BASKETBALL;
 const roomType = process.env.GAME_ROOM_DOUBLEGRID;
-const dummyPlayers = [];    // TODO: Replace with actual database
+const dummyPlayers = {  // TODO: Replace with actual database
+    playing: [],
+    waiting: []
+}    
 
 process.on('uncaughtException', handleUncaughtException)
 
@@ -73,7 +76,7 @@ class Room{
             this.addMatrix(1150,235,'rectangle','screen',100,500,25,25,40,190,'wallScreens',false)
 
         }
-        else if(this.type === 'basketballHoops'){
+        else if(this.type === 'basketball'){
             this.addMatrix(130,130,'rectangle','ledSwitch',960,100,80,80,90,5,'wallButtons', false)
         }
     }
@@ -141,12 +144,12 @@ class Room{
 
             const playerData = { id, playerName, playerAvatar, score: 0 }
 
-            dummyPlayers.push(playerData)
+            dummyPlayers.waiting.push(playerData)
 
             console.log(`RFID scanned: ${id}, broadcasting to door clients`);
             let message = {
                 'type': 'playerAndRoomData', 
-                'playerData': dummyPlayers,
+                'playerData': dummyPlayers.waiting,
                 'roomData': this.type
             }
             room.socketForDoor.broadcastMessage(JSON.stringify(message));
@@ -166,14 +169,30 @@ class Room{
         });
 
         this.server.get('/game/request', async (req, res) => {
-            console.log(req.query);
+            // console.log(req.query);
+            // Move waiting players to the room
+            if(dummyPlayers.waiting && dummyPlayers.waiting.length > 0){
+                if(dummyPlayers.playing.length === 0){
+                    dummyPlayers.playing = [...dummyPlayers.playing, ...dummyPlayers.waiting]
+                    dummyPlayers.waiting = []   // Clear the waiting list
+                }
+            }
+            // Broadcast the updated player data
+            let message = {
+                'type': 'playingList',
+                'playing': dummyPlayers.playing,
+            }
+            room.socketForDoor.broadcastMessage(JSON.stringify(message));
+
             if(this.isFree){
-                this.currentGameSession = new GameSession(req.query.rule,req.query.level)
+                this.currentGameSession = new GameSession(req.query.rule, req.query.level)
                 let gameSessionInitialized = await this.currentGameSession.init()
+                
                 
                 let message = { 
                     'type': 'gameSessionInitialized', 
-                    'message': 'Please wait'
+                    'message': 'Please wait',
+                    'playerData': dummyPlayers.playing,
                 }
                 room.socketForDoor.broadcastMessage(JSON.stringify(message));
                 
@@ -188,7 +207,7 @@ class Room{
                 
             }
             else{
-                this.waitingGameSession = new GameSession(req.query.rule,req.query.level)
+                this.waitingGameSession = new GameSession(req.query.rule, req.query.level)
                 //res.send('<html><body><h1>Please wait</h1></body></html>');
                 res.json({ "waitingGameSession": this.waitingGameSession });
             }
@@ -336,8 +355,6 @@ class GameSession{
         this.score = 0
     }
 
-    // Initializes a variable called result,
-    // It then calls the prepareAndGreet function and awaits its completion
     async init(){
         let result
 
@@ -360,7 +377,6 @@ class GameSession{
         return result
     }
 
-    // Resets the game states
     reset(){
         this.status = undefined
         this.shapes = []
@@ -417,7 +433,7 @@ class GameSession{
                 'countdown':this.countdown,
                 'prepTime':this.prepTime,
                 'roomType':roomType,
-                'players': dummyPlayers,
+                'players': dummyPlayers.playing,
                 'audio': '321go',
                 'message': 'Please enter the room',
             }
@@ -572,22 +588,12 @@ class GameSession{
             return; // Prevent multiple starts
         }
 
-        // TODO : PlaySound('321go.mp3') in the room but also sent to monitors via socket
-        /* setTimeout(() => {
-            let message = {
-                'type': 'newLevelCountdown',
-                'audio': '321go'
-            }
-            room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-            room.socketForRoom.broadcastMessage(JSON.stringify(message))  
-        }, 0) */
-
         console.log('Starting the Game...');
         this.lastLevelStartedAt = Date.now()
         
-        if(roomType === 'doubleGrid'){          // Checks the room type
-            if(this.rule === 1){                // Checks the rule 
-                if(this.level === 1){           // Checks the level
+        if(roomType === 'doubleGrid'){          
+            if(this.rule === 1){                
+                if(this.level === 1){            
 
                     function getRandomInt(min, max) {
                         return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -700,7 +706,7 @@ class GameSession{
                 }
             }
         } 
-        else if(roomType === 'basketballHoops'){
+        else if(roomType === 'basketball'){
             if(this.rule === 1){
                 if(this.level === 1){
                     const colors = [
@@ -804,13 +810,12 @@ class GameSession{
         if (roomType === 'doubleGrid'){
             console.log('Double Grid')
             this.animationMetronome = setInterval(() =>{
-                //this.updatePlayerScore()
                 this.updateCountdown()
                 this.updateShapes()
                 this.applyShapesOnLights()
                 room.sendLightsInstructionsIfIdle()
             } , 1000/25)
-        } else if (roomType === 'basketballHoops'){
+        } else if (roomType === 'basketball'){
             console.log('Basketball Hoops')
             this.animationMetronome = setInterval(() =>{
                 this.updateShapes()
@@ -823,7 +828,6 @@ class GameSession{
                 if (message.type === 'colorNamesEnd') {
                     this.animationMetronome = setInterval(() =>{
                         this.updateCountdown()
-                        //this.updatePlayerScore()
                     } , 1000/25)
                 }
             })
@@ -834,9 +838,6 @@ class GameSession{
         console.log('GameSession Started.');
     }
 
-    // Handles the click event of a light in a game, it checks the room type, game rule, and level to determine the correct action to take based on the light's color and ID
-    // Actions include: losing a life, turning off the light, playing a sound, and completing a level
-    // TODO: Create an event for the continue button
     handleLightClickAction(lightId, whileColorWas){
         // We should assume that if the click event was reported, it means that the click was made during a period where that click actually meant something
         // That implies that we should always set the onClick as ignore is all the other cases (mostly black tiles)
@@ -853,7 +854,6 @@ class GameSession{
                     // - pushing the wrong button => playing fail-sound
                     if(room.lightGroups['mainFloor'].find(obj => obj === clickedLight)){
                         if(whileColorWas === '255,0,0'){
-                            // reset score multiplier
                             this.scoreMultiplier = 1
                             
                             this.removeLife()
@@ -883,7 +883,7 @@ class GameSession{
                                 type: 'playerScored',
                                 audio: 'playerScored',
                                 scoreMultiplier: this.scoreMultiplier,
-                                playerScore: dummyPlayers[0].score
+                                playerScore: dummyPlayers.playing[0].score
                             }
 
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -894,8 +894,8 @@ class GameSession{
                                 this.levelCompleted()
                             }
                         } else {
-                            this.scoreMultiplier = 1 // reset score multiplier
-                            this.removeLife()   // Deducts player life if wrong button number order is pushed
+                            this.scoreMultiplier = 1 
+                            this.removeLife()   
 
                             let message = {
                                 type: 'playerFailed',
@@ -907,13 +907,8 @@ class GameSession{
                     }
                 }
                 else if(this.level === 2){
-                    // Here we expect :
-                    // - walking on red => lose a life
-                    // - pushing the correct next button => turn it off and play success-sound
-                    // - pushing the wrong button => playing fail-sound
                     if(room.lightGroups['mainFloor'].find(obj => obj === clickedLight)){
                         if(whileColorWas === '255,0,0'){
-                            // reset score multiplier
                             this.scoreMultiplier = 1
                             
                             this.removeLife()
@@ -942,7 +937,7 @@ class GameSession{
                                 type: 'playerScored',
                                 audio: 'playerScored',
                                 scoreMultiplier: this.scoreMultiplier,
-                                playerScore: dummyPlayers[0].score
+                                playerScore: dummyPlayers.playing[0].score
                             }
 
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -953,8 +948,8 @@ class GameSession{
                                 this.levelCompleted()
                             }
                         } else {
-                            this.scoreMultiplier = 1    // reset score multiplier
-                            this.removeLife()   // Deducts player life if wrong button number order is pushed
+                            this.scoreMultiplier = 1   
+                            this.removeLife()   
 
                             let message = {
                                 type: 'playerFailed',
@@ -966,13 +961,8 @@ class GameSession{
                     }
                 }
                 else if(this.level === 3) {
-                    // Here we expect :
-                    // - walking on red => lose a life
-                    // - pushing the correct next button => turn it off and play success-sound
-                    // - pushing the wrong button => playing fail-sound
                     if(room.lightGroups['mainFloor'].find(obj => obj === clickedLight)){
                         if(whileColorWas === '255,0,0'){
-                            // reset score multiplier
                             this.scoreMultiplier = 1
 
                             this.removeLife()
@@ -1001,7 +991,7 @@ class GameSession{
                                 type: 'playerScored',
                                 audio: 'playerScored',
                                 scoreMultiplier: this.scoreMultiplier,
-                                playerScore: dummyPlayers[0].score
+                                playerScore: dummyPlayers.playing[0].score
                             }
 
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -1009,8 +999,8 @@ class GameSession{
                             
                             this.ligthIdsSequence.splice(0, 1)
                             if(this.ligthIdsSequence.length === 0){
-                                this.levelCompleted()
-                                /* let message = {
+                                // this.levelCompleted()
+                                let message = {
                                     type: 'levelCompleted',
                                     audio: 'levelCompleted',
                                     message: 'Player Wins'
@@ -1018,11 +1008,11 @@ class GameSession{
     
                                 room.socketForRoom.broadcastMessage(JSON.stringify(message))
                                 room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-                                this.endAndExit() */   // End the game if its the last level
+                                this.endAndExit()   // End the game if its the last level
                             }
                         } else {
-                            this.scoreMultiplier = 1    // reset score multiplier
-                            this.removeLife()   // Deducts player life if wrong button number order is pushed
+                            this.scoreMultiplier = 1    
+                            this.removeLife()   
 
                             let message = {
                                 type: 'playerFailed',
@@ -1035,7 +1025,7 @@ class GameSession{
                 }
             }
         }
-        else if(roomType === 'basketballHoops'){
+        else if(roomType === 'basketball'){
             if(this.rule === 1) {
                 if(this.level === 1) {
                     if(room.lightGroups['wallButtons'].find(obj => obj === clickedLight)){
@@ -1052,7 +1042,7 @@ class GameSession{
                                 audio: 'playerScored',
                                 color: clickedLight.color,
                                 scoreMultiplier: this.scoreMultiplier,
-                                playerScore: dummyPlayers[0].score
+                                playerScore: dummyPlayers.playing[0].score
                             } 
         
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
@@ -1061,9 +1051,7 @@ class GameSession{
                             this.lightColorSequence.splice(0, 1)
                             if(this.lightColorSequence.length === 0){
                                 clearInterval(this.animationMetronome)
-                                // this.levelCompleted()
-                                //this.playerScore += Math.floor(this.remainingScore)
-
+                                
                                 let message = { 
                                     'type': 'levelCompleted',
                                     'message': 'Player Wins',
@@ -1076,8 +1064,8 @@ class GameSession{
                                 this.offerSameLevel() // Loop the game for now  
                             }
                         } else {
-                            this.scoreMultiplier = 1    // reset score multiplier
-                            this.removeLife()   // Deducts player life if wrong button number order is pushed
+                            this.scoreMultiplier = 1    
+                            this.removeLife()   
 
                             let message = {
                                 type: 'playerFailed',
@@ -1094,7 +1082,7 @@ class GameSession{
     }
 
     levelCompleted(){
-        clearInterval(this.animationMetronome)          // Stop the animation
+        clearInterval(this.animationMetronome)          
         
         let message = { 
             'type': 'levelCompleted',
@@ -1305,7 +1293,6 @@ class GameSession{
         } 
     }
 
-    // Sends a message to all connected clients in the room, updating the number of lives
     updateLifes(){
         let message = {
             'type':'updateLifes',
@@ -1328,12 +1315,11 @@ class GameSession{
     correctButton(){
         this.score += this.baseScore * this.scoreMultiplier
         this.scoreMultiplier++
-        dummyPlayers.forEach((player) => {
+        dummyPlayers.playing.forEach((player) => {
             player.score = this.score
         })
     }
 
-    // Updates the active status of shapes based on their activeUntil property and the current time
     updateShapes(){
 
         let now = Date.now()

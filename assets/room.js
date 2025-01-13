@@ -274,7 +274,7 @@ function startListenningToSocket(){
                 roomElement.textContent = ''
                 lifesContainer.innerHTML = ''
                 countdownElement.textContent = '00:00'
-                scorePool.textContent = '250'
+                scoreMultiplier.textContent = '1'
                 playerScore.textContent = '0'
                 setTimeout(() => {
                     playerMessage.textContent = ''
