@@ -86,15 +86,10 @@ function startListenningToSocket(){
                 }
 
                 roomElement.textContent = `Rule ${newGame.rule} Level ${newGame.level}`
-                scorePool.textContent = newGame.scorePool
                 playerScore.textContent = ''
 
                 let prepTime = newGame.prepTime
                 let remainingTime = prepTime
-                if(timerInterval) {
-                    clearInterval(timerInterval)
-                    timerInterval = null
-                }
 
                 const updateTimer = () => {
                     let minutes = Math.floor(remainingTime / 60)
@@ -103,6 +98,7 @@ function startListenningToSocket(){
                     minutes = minutes < 10 ? '0' + minutes : minutes
                     seconds = seconds < 10 ? '0' + seconds : seconds
 
+                    console.log('newGame', remainingTime)
                     countdownElement.textContent = `${minutes}:${seconds}`
 
                     if(remainingTime === 3){
@@ -120,10 +116,10 @@ function startListenningToSocket(){
 
                 timerInterval = setInterval(updateTimer, 1000)
             }
-            else if(json.type === 'newLevelCountdown'){
+            /* else if(json.type === 'newLevelCountdown'){
                 console.log(json.audio)
                 fetchAudio(json.audio)
-            }
+            } */
             else if(json.type === 'playerScored'){
                 fetchAudio(json.audio)
                 setColorToSpan(json.color)

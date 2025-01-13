@@ -144,7 +144,7 @@ class Room{
 
             const playerData = { id, playerName, playerAvatar, score: 0 }
 
-            dummyPlayers.push(playerData)
+            dummyPlayers.push(playerData)   // add players to waiting list
 
             console.log(`RFID scanned: ${id}, broadcasting to door clients`);
             let message = {
@@ -205,8 +205,7 @@ class Room{
                 room.socketForDoor.broadcastMessage(JSON.stringify(message));
                 
                 if(gameSessionInitialized === true){
-                    //res.send('<html><body><h1>Please enter the room</h1></body></html>');
-                    
+                    //res.send('<html><body><h1>Please enter the room</h1></body></html>');    
                     res.json({ "gameSessionInitialized": gameSessionInitialized });
                 }
                 else{
@@ -390,6 +389,10 @@ class GameSession{
     reset(){
         this.status = undefined
         this.shapes = []
+        if(this.doorTimer){
+            clearInterval(this.doorTimer)
+            this.doorTimer = undefined
+        }
         this.lastLevelCreatedAt = Date.now()
         room.lights.forEach(light => {
             light.color = black
@@ -888,6 +891,8 @@ class GameSession{
 
                             this.correctButton()
 
+                            console.log(dummyPlayers[0].playerName, ' scored!', dummyPlayers[0].score)
+
                             //TODO : room.playSound('success1')
                             let message = {
                                 type: 'playerScored',
@@ -1287,6 +1292,7 @@ class GameSession{
             }
             else {
                 let message = {'type':'timeIsUp'}
+                this.endAndExit()
                 room.socketForDoor.broadcastMessage(JSON.stringify(message))
             }
         }

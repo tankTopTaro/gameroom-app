@@ -147,6 +147,7 @@ function renderDoorData(data){
             console.log('Player id', player.id, 'isAlreadyWaiting', isAlreadyPlaying)
             
             if(!isAlreadyPlaying && players.waiting.length < 6){
+                players.waiting = []
                 players.waiting.push(player)
             }
         })

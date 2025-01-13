@@ -227,10 +227,10 @@ function startListenningToSocket(){
                     roomElement.textContent = 'Room: ' + roomType + ' Rule: ' + rule + ' Level: ' + level
                 }, 1000)
             }
-            if(json.type === 'newLevelCountdown'){
+            /* if(json.type === 'newLevelCountdown'){
                 //console.log(json.audio)
-                fetchAudio(json.audio)
-            }
+                //fetchAudio(json.audio)
+            } */
             if(json.type === 'colorNames'){
                 let color = json
                 
