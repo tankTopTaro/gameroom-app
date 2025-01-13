@@ -3,15 +3,14 @@ let monitoringIsOn = true
 let timerInterval = null
 let isGameOver = false
 let audioQueue = []
-
-let playerData = {}
+let playerData = []
 
 const roomElement = document.getElementById('room-info')
 const lifesContainer = document.getElementById('lifes-container')
 const countdownElement = document.getElementById('countdown')
 const playerMessage = document.getElementById('player-alert')
 const colorSequence = document.getElementById('color-sequence')
-const scorePool = document.getElementById('score-pool')
+const scoreMultiplier = document.getElementById('score-multiplier')
 const playerScore = document.getElementById('player-score')
 
 const heartSVG = `<svg id="heart" xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-heart">
@@ -49,6 +48,10 @@ function startListenningToSocket(){
             if(json.type === 'newLevelStarts'){
                 let newGame = json  
                 console.log('newLevelStarts', newGame)
+
+                // reset the score multiplier
+                scoreMultiplier.textContent = 1
+                playerScore.textContent = newGame.players[0].score
 
                 // Reset the color sequence colors
                 resetSpanColors()
@@ -121,17 +124,15 @@ function startListenningToSocket(){
                 console.log(json.audio)
                 fetchAudio(json.audio)
             }
-            else if(json.type === 'playerAndRoomData'){
-                let playerDat = {...json}
-                console.log('Player and room data:', playerDat)
-            }
             else if(json.type === 'playerScored'){
                 fetchAudio(json.audio)
-                console.log('Color clicked:', json.color)
                 setColorToSpan(json.color)
+                scoreMultiplier.textContent = json.scoreMultiplier
+                playerScore.textContent = json.playerScore
             }
             else if(json.type === 'playerFailed'){
                 console.log('Color clicked:', json.color)
+                scoreMultiplier.textContent = json.scoreMultiplier
                 setColorToSpan(json.color)
             }
             if(json.type === 'colorNames'){
@@ -200,12 +201,6 @@ function startListenningToSocket(){
                     countdownElement.textContent = `${minutes}:${seconds}`
                 }
             }
-            else if(json.type === 'updatePlayerScore'){
-                scorePool.textContent = json.scorePool
-            }
-            else if(json.type === 'levelCompleted'){
-                playerScore.textContent = json.totalScore
-            }
             else if(json.type === 'offerSameLevel' || 
                 json.type === 'offerNextLevel'){
                 console.log(json.message)
@@ -273,10 +268,6 @@ function startListenningToSocket(){
                         });
                     }
                 }, 2000)
-
-                setTimeout(() => {
-                    noBtn.click()
-                }, 5000)
             }
             else if(json.type === 'gameEnded'){
                 playerMessage.textContent = json.message
