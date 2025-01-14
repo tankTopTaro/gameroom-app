@@ -604,6 +604,7 @@ class GameSession{
         console.log('Starting the Game...');
         this.lastLevelStartedAt = Date.now()
         
+        // This handles the creation and logic of game levels
         if(roomType === 'doubleGrid'){          
             if(this.rule === 1){                
                 if(this.level === 1){            

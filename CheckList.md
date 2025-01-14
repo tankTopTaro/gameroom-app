@@ -26,8 +26,8 @@
         - [x] Losing: ask if they want to try again (by pressing a blinking button in the room)
       - [x] If next group is waiting at the door, then
         - [x] Ask current group to leave the room
-  - [ ] Keep the current code architecture.
-  - [ ] Propose, in a text document, an optimal way of refactoring the code, in order to allow many different room setups and game rules, not by putting them in `if statements`, but rather in a modular way
+  - [x] Keep the current code architecture.
+  - [x] Propose, in a text document, an optimal way of refactoring the code, in order to allow many different room setups and game rules, not by putting them in `if statements`, but rather in a modular way
 
 ## The Game Screen
   - [x] Come up with a sober design that fits our needs for this page and make it functional

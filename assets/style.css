@@ -277,7 +277,7 @@ html, body {
     background-image: conic-gradient(#00dbde, #fc00ff, #00dbde);
     inset: 0px;
     z-index: -1;
-    /* animation: rotate 3s linear infinite; */
+    animation: rotate 3s linear infinite;
 }
 
 .circle:hover::before, .circle:hover::after {
