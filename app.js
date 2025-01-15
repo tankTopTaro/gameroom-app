@@ -16,8 +16,9 @@ const { handleUncaughtException, hsvToRgb, areRectanglesIntersecting } = require
 
 require('dotenv').config();
 
-const roomType = process.env.GAME_ROOM_BASKETBALL;
-//const roomType = process.env.GAME_ROOM_DOUBLEGRID;
+//const roomType = process.env.GAME_ROOM_BASKETBALL;      // remove/add comment to choose a room
+const roomType = process.env.GAME_ROOM_DOUBLEGRID;
+
 const dummyPlayers = [] // TODO: Replace with actual database
 
 process.on('uncaughtException', handleUncaughtException)
