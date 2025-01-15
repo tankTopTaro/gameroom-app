@@ -77,7 +77,7 @@ function startListenningToSocket(){
                     }
                 }
 
-                if(newGame.roomType === 'basketballHoops'){
+                if(newGame.roomType === 'basketball'){
                     colorSequence.classList.remove('invisible')
                     colorSequence.classList.add('visible')
                 } else {
@@ -128,7 +128,8 @@ function startListenningToSocket(){
             }
             else if(json.type === 'playerFailed'){
                 console.log('Color clicked:', json.color)
-                scoreMultiplier.textContent = json.scoreMultiplier
+                scoreMultiplier.textContent = '1'   // reset score multiplier display
+                playerScore.textContent = json.playerScore
                 setColorToSpan(json.color)
             }
             if(json.type === 'colorNames'){
@@ -339,6 +340,13 @@ function setColorToSpan(color) {
     const spans = colorSequence.querySelectorAll('span');
 
     if(spans.length > 0 && color){
+        const allSpansFilled = Array.from(spans).every(span => span.style.backgroundColor);
+
+        // Reset all spans if all are filled
+        if (allSpansFilled) {
+            resetSpanColors();
+        }
+        
         const [r, g, b] = color;
 
         console.log('r', r, 'g', g, 'b', b)

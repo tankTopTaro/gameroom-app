@@ -358,14 +358,6 @@ async function fetchAudio(soundName) {
         const response = await fetch(`/game/audio`)
         const data = await response.json()
         
-        // console.log(data)
-        /* const audio = new Audio(data[soundName])
-        audio.muted = true;
-        audio.play().then(() => {
-            audio.muted = false;
-        }).catch(err => {
-            console.error('Autoplay failed:', err)
-        }); */
         return new Promise((resolve, reject) => {
             const audio = new Audio(data[soundName])
             audio.muted = true;

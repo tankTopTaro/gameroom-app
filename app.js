@@ -16,8 +16,8 @@ const { handleUncaughtException, hsvToRgb, areRectanglesIntersecting } = require
 
 require('dotenv').config();
 
-//const roomType = process.env.GAME_ROOM_BASKETBALL;
-const roomType = process.env.GAME_ROOM_DOUBLEGRID;
+const roomType = process.env.GAME_ROOM_BASKETBALL;
+//const roomType = process.env.GAME_ROOM_DOUBLEGRID;
 const dummyPlayers = [] // TODO: Replace with actual database
 
 process.on('uncaughtException', handleUncaughtException)
@@ -879,7 +879,8 @@ class GameSession{
                             let message = {
                                 type: 'playerFailed',
                                 audio: 'playerFailed',
-                                scoreMultiplier: this.scoreMultiplier
+                                scoreMultiplier: this.scoreMultiplier,
+                                playerScore: dummyPlayers[0].score
                             }
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
                         }
@@ -916,7 +917,8 @@ class GameSession{
                             let message = {
                                 type: 'playerFailed',
                                 audio: 'playerFailed',
-                                scoreMultiplier: this.scoreMultiplier
+                                scoreMultiplier: this.scoreMultiplier,
+                                playerScore: dummyPlayers[0].score
                             }
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
                         }
@@ -936,7 +938,8 @@ class GameSession{
                             let message = {
                                 type: 'playerFailed',
                                 audio: 'playerFailed',
-                                scoreMultiplier: this.scoreMultiplier
+                                scoreMultiplier: this.scoreMultiplier,
+                                playerScore: dummyPlayers[0].score
                             }
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
                         }
@@ -970,7 +973,8 @@ class GameSession{
                             let message = {
                                 type: 'playerFailed',
                                 audio: 'playerFailed',
-                                scoreMultiplier: this.scoreMultiplier
+                                scoreMultiplier: this.scoreMultiplier,
+                                playerScore: dummyPlayers[0].score
                             }
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
                         }
@@ -990,7 +994,8 @@ class GameSession{
                             let message = {
                                 type: 'playerFailed',
                                 audio: 'playerFailed',
-                                scoreMultiplier: this.scoreMultiplier
+                                scoreMultiplier: this.scoreMultiplier,
+                                playerScore: dummyPlayers[0].score
                             }
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
                         }
@@ -1033,7 +1038,8 @@ class GameSession{
                             let message = {
                                 type: 'playerFailed',
                                 audio: 'playerFailed',
-                                scoreMultiplier: this.scoreMultiplier
+                                scoreMultiplier: this.scoreMultiplier,
+                                playerScore: dummyPlayers[0].score
                             }
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
                         }
@@ -1086,7 +1092,9 @@ class GameSession{
                             let message = {
                                 type: 'playerFailed',
                                 audio: 'playerFailed',
-                                color: clickedLight.color
+                                color: clickedLight.color,
+                                scoreMultiplier: this.scoreMultiplier,
+                                playerScore: dummyPlayers[0].score
                             }
                             room.socketForRoom.broadcastMessage(JSON.stringify(message))
                         }
@@ -1098,21 +1106,25 @@ class GameSession{
     }
 
     levelCompleted(){
-        clearInterval(this.animationMetronome)          
-        
+        clearInterval(this.animationMetronome)    
         let message = { 
             'type': 'levelCompleted',
             'message': 'Player Wins',
             'audio': 'levelCompleted'
-        }
+        }      
 
-        room.socketForMonitor.broadcastMessage(JSON.stringify(message))
-        room.socketForRoom.broadcastMessage(JSON.stringify(message))
+        if(room.waitingGameSession === undefined){  
+    
+            room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+            room.socketForRoom.broadcastMessage(JSON.stringify(message))
 
-        if(room.waitingGameSession === undefined){       
             this.offerNextLevel()
         }
         else if(this.levelsStartedWhileSessionIsWaiting < 3){
+    
+            room.socketForMonitor.broadcastMessage(JSON.stringify(message))
+            room.socketForRoom.broadcastMessage(JSON.stringify(message))
+
             this.offerNextLevel()
         }
         else{
