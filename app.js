@@ -1,7 +1,7 @@
 /**
  * Date started: 2024-12-12
  * Author: Kevin Balmores
- * Last modified: 2025-01-02
+ * Last modified: 2025-01-15
  * 
  * 
  * Terminal: node app.js
@@ -114,7 +114,7 @@ class Room{
         // Prepare server
         this.server = express();
         const serverPort = process.env.GAME_ROOM_SERVER_PORT || 3001;
-        const serverHostname = 'localhost';
+        const serverHostname = process.env.GAME_ROOM_SERVER_HOST || 'localhost';
 
         // Middleware to set no-cache headers for all routes
         this.server.use((req, res, next) => {
